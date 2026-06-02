@@ -17,7 +17,7 @@ export default function Register() {
       const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, department, jobTitle }) // your existing state variables
+        body: JSON.stringify(formData) // <-- THIS IS THE FIX!
       });
 
       if (response.ok) {
