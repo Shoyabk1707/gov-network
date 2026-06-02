@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Feed from './Feed';
+import { API_BASE_URL } from '../config';
 
 export default function Dashboard({ onLogout }) {
   const [user, setUser] = useState(null);
@@ -8,7 +9,7 @@ export default function Dashboard({ onLogout }) {
     const fetchProfile = async () => {
       const token = localStorage.getItem('token');
       try {
-        const response = await fetch('http://localhost:5000/api/auth/me', {
+        const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
           method: 'GET',
           headers: { 
             'Authorization': `Bearer ${token}` 

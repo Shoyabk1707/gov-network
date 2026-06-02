@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
@@ -10,7 +11,7 @@ export default function Feed() {
   // Fetch all posts from backend
   const fetchPosts = async () => {
     try {
-      const res = await fetch('http://localhost:5000/api/posts', {
+      const res = await fetch(`${API_BASE_URL}/api/posts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
