@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE_URL } from '../config';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -12,20 +13,22 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
+      // 1. Use the live cloud URL
+      const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ name, email, password, department, jobTitle }) // your existing state variables
       });
-      
-      const data = await response.json();
-      
+
       if (response.ok) {
-        alert('Registration Successful!');
+        // 2. Redirect the user to the login page so they can sign in
+        window.location.href = '/'; // Or '/login' depending on your route setup
       } else {
-        alert(`Error: ${data.message}`);
+        const errorData = await response.json();
+        alert(errorData.message || 'Registration failed');
       }
-    } catch (error) {
+    } catch (err) {
+      console.error(err);
       alert('Server connection failed!');
     }
   };
