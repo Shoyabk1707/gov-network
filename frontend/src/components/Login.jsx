@@ -20,7 +20,8 @@ export default function Login() {
       
       if (response.ok) {
         // Save the digital ID badge in the browser's memory
-        localStorage.setItem('token', data.token);
+        localStorage.setItem('token', data.token);\
+        window.location.reload();
         alert('Login Successful! Badge secured.');
       } else {
         alert(`Error: ${data.message}`);
