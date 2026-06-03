@@ -1,18 +1,32 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 
-// 1. Create a new official notice
+// Create a new post (Personal OR Page Post)
 const createPost = async (req, res) => {
   try {
-    const { title, content, category } = req.body;
-    const newPost = await Post.create({
-      user: req.user, // Grabbed securely from our auth middleware
+    // 1. Destructure pageId along with title, content, and category
+    const { title, content, category, pageId } = req.body;
+    const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
+
+    // 2. Build the database object payload
+    const postData = {
+      user: currentUserId, // Author remains the authenticated user
       title,
       content,
-      category
-    });
-    res.status(201).json(newPost);
+      category,
+      page: pageId ? pageId : null // If pageId is provided, link it. Otherwise, personal post.
+    };
+
+    const newPost = await Post.create(postData);
+
+    // 3. Populate user info so the frontend receives author names instantly
+    const populatedPost = await Post.findById(newPage._id)
+                                    .populate('user', 'name role')
+                                    .populate('page', 'name category'); // Also pull brand name if it's a page post
+
+    res.status(201).json(populatedPost);
   } catch (error) {
+    console.error('Create Post Error:', error.message);
     res.status(500).json({ message: 'Server Error' });
   }
 };
