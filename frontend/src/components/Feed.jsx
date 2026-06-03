@@ -23,20 +23,24 @@ export default function Feed() {
 
   useEffect(() => { fetchPosts(); }, []);
 
-  // Handle publishing a new post
+ // Handle publishing a new post
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
-        headers: {
+        headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${localStorage.getItem('token')}` 
         },
-        body: JSON.stringify({ title, content, category })
+        // 👇 THIS IS THE FIXED LINE 👇
+        body: JSON.stringify({ title, content, category }) 
       });
+      
       if (res.ok) {
-        setTitle(''); setContent('');
+        setTitle(''); 
+        setContent('');
+        // Optional: setCategory('General') if you want to reset the dropdown
         fetchPosts(); // Refresh timeline instantly
       }
     } catch (err) {
@@ -46,7 +50,7 @@ export default function Feed() {
 
   const handleLike = async (postId) => {
     try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
