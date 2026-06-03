@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import Register from './components/Register';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import Profile from './components/Profile'; 
+import Profile from './components/Profile';
+import Network from './components/Network';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,6 +41,13 @@ function App() {
             >
               Feed
             </button>
+            {/* NEW NETWORK BUTTON */}
+            <button 
+              onClick={() => setCurrentView('network')} 
+              className={currentView === 'network' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
+            >
+              Network
+            </button>
             <button 
               onClick={() => setCurrentView('profile')} 
               className={currentView === 'profile' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
@@ -57,11 +65,9 @@ function App() {
 
         {/* --- RENDER THE SELECTED VIEW --- */}
         <div>
-          {currentView === 'dashboard' ? (
-            <Dashboard onLogout={handleLogout} /> 
-          ) : (
-            <Profile />
-          )}
+          {currentView === 'dashboard' && <Dashboard onLogout={handleLogout} />}
+          {currentView === 'profile' && <Profile />}
+          {currentView === 'network' && <Network />}
         </div>
       </div>
     );
