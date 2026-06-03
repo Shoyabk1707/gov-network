@@ -40,9 +40,9 @@ export default function Dashboard({ onLogout }) {
         <p className="text-gray-500 text-sm mb-6">Department : {user.department}</p>
         <div className="border-t pt-4">
           <p className="text-xs text-gray-400 mb-4">Official Email: {user.email}</p>
-          <button onClick={onLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition text-sm font-semibold">
+          {/*<button onClick={onLogout} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition text-sm font-semibold">
             Logout
-          </button>
+          </button>*/}
         </div>
       </div>
 
