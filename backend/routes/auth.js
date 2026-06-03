@@ -1,82 +1,34 @@
-import { useState, useEffect } from 'react';
-import Register from './components/Register';
-import Login from './components/Login';
-import Dashboard from './components/Dashboard';
-import Profile from './components/Profile'; // <-- 1. Import your new Profile component
+const express = require('express');
+const router = express.Router();
+const { registerUser, loginUser, getUserProfile } = require('../controllers/authController');
+const protect = require('../middleware/authMiddleware'); // Import middleware
+const User = require('../models/User'); // <-- FIX 1: Imported the User model!
 
-function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showLogin, setShowLogin] = useState(true);
-  const [currentView, setCurrentView] = useState('dashboard'); // <-- 2. Add state to track which page we are on
+router.post('/register', registerUser);
+router.post('/login', loginUser);
+router.get('/me', protect, getUserProfile); // Protected route!
 
-  // Check if user already has a valid badge on page load
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) setIsAuthenticated(true);
-  }, []);
+// Update User Profile
+router.put('/profile', protect, async (req, res) => { // <-- FIX 2: Changed 'auth' to 'protect'
+  try {
+    const { 
+      name, tagline, city, state, bio, skills, experience, education 
+    } = req.body;
+    
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: { 
+          name, tagline, city, state, bio, skills, experience, education 
+        } 
+      },
+      { new: true } 
+    ).select('-password'); 
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setIsAuthenticated(false);
-    setCurrentView('dashboard'); // Reset view on logout
-  };
-
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        
-        {/* --- 3. NEW NAVIGATION BAR --- */}
-        <nav className="bg-white shadow-sm border-b p-4 flex justify-between items-center mb-6 px-4 md:px-10">
-          <h1 
-            onClick={() => setCurrentView('dashboard')}
-            className="text-2xl font-bold text-blue-600 cursor-pointer"
-          >
-            GovNetwork
-          </h1>
-          
-          <div className="flex gap-6 items-center font-medium text-gray-700">
-            <button 
-              onClick={() => setCurrentView('dashboard')} 
-              className={currentView === 'dashboard' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
-            >
-              Feed
-            </button>
-            <button 
-              onClick={() => setCurrentView('profile')} 
-              className={currentView === 'profile' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
-            >
-              Profile
-            </button>
-            <button 
-              onClick={handleLogout} 
-              className="text-red-500 hover:bg-red-50 px-3 py-1 rounded transition"
-            >
-              Logout
-            </button>
-          </div>
-        </nav>
-
-        {/* --- 4. RENDER THE SELECTED VIEW --- */}
-        <div>
-          {currentView === 'dashboard' ? (
-            <Dashboard onLogout={handleLogout} /> 
-          ) : (
-            <Profile />
-          )}
-        </div>
-      </div>
-    );
+    res.json(updatedUser);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server Error');
   }
+});
 
-  return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-      {showLogin ? <Login /> : <Register />}
-      
-      <button onClick={() => setShowLogin(!showLogin)} className="mt-4 text-blue-600 underline">
-        {showLogin ? "Need an account? Register here." : "Already have an account? Login here."}
-      </button>
-    </div>
-  );
-}
-
-export default App;
+module.exports = router;
