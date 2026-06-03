@@ -27,7 +27,7 @@ export default function Feed() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:5000/api/posts', {
+      const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ export default function Feed() {
 
   const handleLike = async (postId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/posts/${postId}/like`, {
+            const response = await fetch(`${API_BASE_URL}/api/auth/me`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
