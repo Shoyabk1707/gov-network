@@ -4,11 +4,14 @@ import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import Profile from './components/Profile';
 import Network from './components/Network';
+import CreatorProfile from './components/CreatorProfile';
+import ManagePages from './components/ManagePages';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showLogin, setShowLogin] = useState(true);
   const [currentView, setCurrentView] = useState('dashboard'); 
+  const [selectedUserId, setSelectedUserId] = useState(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -41,13 +44,21 @@ function App() {
             >
               Feed
             </button>
-            {/* NEW NETWORK BUTTON */}
             <button 
               onClick={() => setCurrentView('network')} 
               className={currentView === 'network' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
             >
               Network
             </button>
+            
+            {/* 1. NEW: PAGES BUTTON IN NAVBAR */}
+            <button 
+              onClick={() => setCurrentView('managePages')} 
+              className={currentView === 'managePages' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
+            >
+              Pages
+            </button>
+
             <button 
               onClick={() => setCurrentView('profile')} 
               className={currentView === 'profile' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
@@ -67,7 +78,25 @@ function App() {
         <div>
           {currentView === 'dashboard' && <Dashboard onLogout={handleLogout} />}
           {currentView === 'profile' && <Profile />}
-          {currentView === 'network' && <Network />}
+
+          {currentView === 'network' && (
+            <Network onViewProfile={(id) => {
+              setSelectedUserId(id);
+              setCurrentView('creatorProfile');
+            }} />
+          )}
+
+          {currentView === 'creatorProfile' && (
+            <CreatorProfile 
+              userId={selectedUserId} 
+              onBack={() => setCurrentView('network')} 
+            />
+          )}
+
+          {/* 2. NEW: RENDER MANAGE PAGES VIEW */}
+          {currentView === 'managePages' && (
+            <ManagePages onBack={() => setCurrentView('dashboard')} />
+          )}
         </div>
       </div>
     );

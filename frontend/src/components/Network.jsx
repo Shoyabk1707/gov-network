@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 
-export default function Network() {
+export default function Network({ onViewProfile }) { // <-- Add the prop here
   const [users, setUsers] = useState([]);
   
   // NEW: State to track which buttons we've clicked during this session
@@ -113,6 +113,12 @@ export default function Network() {
               }`}>
                 {u.role.toUpperCase()}
               </span>
+
+                <div className="mb-4">
+                <button onClick={() => onViewProfile(u._id)} className="text-blue-600 hover:underline text-sm font-medium">
+                    View Full Profile
+                </button>
+              </div>
               
               <div className="flex flex-col gap-2 px-4">
                 {/* DYNAMIC FOLLOW BUTTON */}

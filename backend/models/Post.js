@@ -3,8 +3,13 @@ const mongoose = require("mongoose");
 const postSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", // Links the post to a specific verified user
+    ref: "User", 
     required: true,
+  },
+  page: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Page", // 
+    default: null, 
   },
   title: {
     type: String,
@@ -15,14 +20,13 @@ const postSchema = new mongoose.Schema({
     required: true,
   },
   category: {
-    type: String, // e.g., "Official Circular", "Inter-Departmental", "General"
+    type: String, 
     default: "General",
   },
-  // Holds the IDs of users who liked this post so they can't like it twice
   likes: [{ 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
-    }],
+  }],
   createdAt: {
     type: Date,
     default: Date.now,

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const User = require('../models/User');
+const Post = require('../models/Post');
 
 // 1. DISCOVER: Get users to connect with (excluding yourself)
 router.get('/discover', protect, async (req, res) => {
@@ -90,6 +91,40 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
     res.json({ msg: "Guidance request sent successfully!" });
   } catch (err) {
     console.error(err.message);
+    res.status(500).send('Server Error');
+  }
+});
+
+// 4. CREATOR PAGE: Get a specific user's public profile AND their posts
+router.get('/user/:id', protect, async (req, res) => {
+  try {
+    const targetUserId = req.params.id;
+
+    // 1. Fetch the user's profile (hiding their private email and password)
+    const profile = await User.findById(targetUserId).select('-password -email');
+    
+    if (!profile) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    // 2. Fetch only the posts created by this specific user
+    const posts = await Post.find({ user: targetUserId })
+                            .populate('user', 'name role') // Get author details
+                            .sort({ createdAt: -1 });      // Newest first
+
+    // 3. Package them together and send them to the frontend
+    res.json({ 
+        profile: profile, 
+        posts: posts 
+    });
+
+  } catch (err) {
+    console.error("Creator Page Error:", err.message);
+    
+    // If the frontend sends a weird/invalid ID format, catch it gracefully
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: "User not found" }); 
+    }
     res.status(500).send('Server Error');
   }
 });

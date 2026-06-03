@@ -1,0 +1,35 @@
+const Page = require('../models/Page');
+
+// 1. Create a new Institute/Brand Page
+const createPage = async (req, res) => {
+  try {
+    const { name, category, bio } = req.body;
+    const currentUserId = req.user.id ? req.user.id : req.user;
+
+    const newPage = await Page.create({
+      name,
+      category,
+      bio,
+      admin: currentUserId // Logged-in user is the owner/admin
+    });
+
+    res.status(201).json(newPage);
+  } catch (error) {
+    console.error('Create Page Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// 2. Get all pages managed by the logged-in user
+const getUserPages = async (req, res) => {
+  try {
+    const currentUserId = req.user.id ? req.user.id : req.user;
+    const pages = await Page.find({ admin: currentUserId });
+    res.json(pages);
+  } catch (error) {
+    console.error('Get User Pages Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+module.exports = { createPage, getUserPages };
