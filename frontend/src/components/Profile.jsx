@@ -56,7 +56,6 @@ export default function Profile() {
   // Generic Save Function to Database
   const saveToDatabase = async (updatedFields) => {
     try {
-      // We must send the whole object so we don't overwrite existing data with null
       const payload = {
         name: user.name, tagline: user.tagline, city: user.city, state: user.state,
         bio: user.bio, skills: user.skills, experience: user.experience, education: user.education,
@@ -70,13 +69,25 @@ export default function Profile() {
       });
       
       if (res.ok) {
-        setShowEditModal(false); setShowExpModal(false); setShowEduModal(false);
+        // 1. Get the newly updated user directly from this response
+        const updatedUserData = await res.json();
+        
+        // 2. Instantly update the UI state (bypasses browser caching!)
+        setUser(updatedUserData); 
+        
+        // 3. Close Modals & Clear Forms
+        setShowEditModal(false); 
+        setShowExpModal(false); 
+        setShowEduModal(false);
         setExpData({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
         setEduData({ school: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
-        fetchProfileData(); 
+        
+      } else {
+        const errorText = await res.text();
+        alert(`⚠️ Backend Error (${res.status}): ${errorText}`);
       }
     } catch (err) {
-      console.error('Failed to update profile');
+       alert(`⚠️ Network Error: ${err.message}`);
     }
   };
 
