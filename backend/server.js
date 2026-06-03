@@ -13,6 +13,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/posts', require('./routes/posts'));
+app.use('/api/network', require('./routes/network'));
 
 app.get('/', (req, res) => {
   res.send('GovNetwork Backend is running!');
