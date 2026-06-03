@@ -8,15 +8,20 @@ router.post('/login', loginUser);
 router.get('/me', protect, getUserProfile); // Protected route!
 
 // Update User Profile
+// Update User Profile
 router.put('/profile', auth, async (req, res) => {
   try {
-    const { name, department, jobTitle, bio, skills } = req.body;
+    const { 
+      name, tagline, city, state, bio, skills, experience, education 
+    } = req.body;
     
-    // Find user and update their details
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
-      { $set: { name, department, jobTitle, bio, skills } },
-      { new: true } // Returns the updated document
+      { $set: { 
+          name, tagline, city, state, bio, skills, experience, education 
+        } 
+      },
+      { new: true } 
     ).select('-password'); 
 
     res.json(updatedUser);
