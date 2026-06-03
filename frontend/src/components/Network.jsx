@@ -3,6 +3,11 @@ import { API_BASE_URL } from '../config';
 
 export default function Network() {
   const [users, setUsers] = useState([]);
+  
+  // NEW: State to track which buttons we've clicked during this session
+  const [followedUsers, setFollowedUsers] = useState([]);
+  const [requestedUsers, setRequestedUsers] = useState([]);
+  
   const token = localStorage.getItem('token');
 
   useEffect(() => {
@@ -11,12 +16,35 @@ export default function Network() {
 
   const fetchDiscoverUsers = async () => {
     try {
+      // 1. Fetch the currently logged-in user to see their existing connections
+      const resMe = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const meData = await resMe.ok ? await resMe.json() : null;
+
+      if (meData) {
+        // Pre-fill the followed buttons using the actual database!
+        setFollowedUsers(meData.following || []);
+      }
+
+      // 2. Fetch the list of users to discover
       const res = await fetch(`${API_BASE_URL}/api/network/discover`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
+      
+      if (res.ok && meData) {
         const data = await res.json();
         setUsers(data);
+
+        // 3. Pre-fill the requested guidance buttons
+        const alreadyRequested = [];
+        data.forEach(user => {
+          const requested = user.mentorshipRequests?.some(
+            req => String(req.fromUser) === String(meData._id)
+          );
+          if (requested) alreadyRequested.push(user._id);
+        });
+        setRequestedUsers(alreadyRequested);
       }
     } catch (err) {
       console.error(err);
@@ -31,7 +59,8 @@ export default function Network() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Successfully followed!');
+        // NEW: Instantly update the UI without reloading
+        setFollowedUsers(prev => [...prev, id]); 
       } else {
         alert(`⚠️ ${data.msg}`);
       }
@@ -52,7 +81,8 @@ export default function Network() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert('Guidance request sent!');
+        // NEW: Instantly update the UI without reloading
+        setRequestedUsers(prev => [...prev, id]);
       } else {
         alert(`⚠️ ${data.msg}`);
       }
@@ -77,7 +107,6 @@ export default function Network() {
               <h2 className="font-bold text-lg text-gray-900">{u.name}</h2>
               <p className="text-sm text-gray-500 mb-3">{u.tagline || 'GovNetwork Member'}</p>
               
-              {/* Role Badge */}
               <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold mb-5 ${
                 u.role === 'official' ? 'bg-blue-100 text-blue-800' : 
                 u.role === 'creator' ? 'bg-purple-100 text-purple-800' : 'bg-green-100 text-green-800'
@@ -86,21 +115,34 @@ export default function Network() {
               </span>
               
               <div className="flex flex-col gap-2 px-4">
-                <button 
-                  onClick={() => handleFollow(u._id)}
-                  className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium transition"
-                >
-                  Follow
-                </button>
-                
-                {/* Only show Guidance button for Officials */}
-                {u.role === 'official' && (
-                  <button 
-                    onClick={() => handleRequestGuidance(u._id)}
-                    className="w-full py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 text-sm font-medium transition"
-                  >
-                    Request Guidance
+                {/* DYNAMIC FOLLOW BUTTON */}
+                {followedUsers.includes(u._id) ? (
+                  <button disabled className="w-full py-2 bg-gray-100 text-gray-500 rounded text-sm font-medium cursor-not-allowed border border-gray-200">
+                    Following
                   </button>
+                ) : (
+                  <button 
+                    onClick={() => handleFollow(u._id)}
+                    className="w-full py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-medium transition"
+                  >
+                    Follow
+                  </button>
+                )}
+                
+                {/* DYNAMIC GUIDANCE BUTTON */}
+                {u.role === 'official' && (
+                  requestedUsers.includes(u._id) ? (
+                     <button disabled className="w-full py-2 border border-gray-200 text-gray-400 rounded bg-gray-50 text-sm font-medium cursor-not-allowed">
+                      Guidance Requested
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleRequestGuidance(u._id)}
+                      className="w-full py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 text-sm font-medium transition"
+                    >
+                      Request Guidance
+                    </button>
+                  )
                 )}
               </div>
 
