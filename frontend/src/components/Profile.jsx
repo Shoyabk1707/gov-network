@@ -22,21 +22,33 @@ export default function Profile() {
       const resProfile = await fetch(`${API_BASE_URL}/api/auth/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
+      
+      let currentUserData = null; // Store it in a standard variable first!
+
       if (resProfile.ok) {
-        const data = await resProfile.json();
-        setUser(data);
+        currentUserData = await resProfile.json();
+        setUser(currentUserData);
         setFormData({
-          name: data.name || '', tagline: data.tagline || '', city: data.city || '', 
-          state: data.state || '', bio: data.bio || '', skills: data.skills || ''
+          name: currentUserData.name || '', tagline: currentUserData.tagline || '', city: currentUserData.city || '', 
+          state: currentUserData.state || '', bio: currentUserData.bio || '', skills: currentUserData.skills || ''
         });
       }
 
       const resPosts = await fetch(`${API_BASE_URL}/api/posts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (resPosts.ok) {
+      
+      if (resPosts.ok && currentUserData) {
         const allPosts = await resPosts.json();
-        setUserPosts(allPosts.filter(post => post.user === user?._id));
+        
+        // Use currentUserData._id, NOT user._id!
+        // Also checks if post.user is an object or a string
+        const userPosts = allPosts.filter(post => {
+            const postAuthorId = post.user?._id || post.user; 
+            return String(postAuthorId) === String(currentUserData._id);
+        });
+        
+        setUserPosts(userPosts);
       }
     } catch (err) {
       console.error(err);
@@ -210,19 +222,52 @@ export default function Profile() {
         )}
       </div>
 
-      {/* Activity Section */}
+     {/* Activity Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">Activity</h2>
+        
         {userPosts.length > 0 ? (
-          <div className="space-y-3">
-            {userPosts.slice(0, 2).map(post => (
-              <div key={post._id} className="text-sm text-gray-700 border-b pb-2">
-                <span className="font-semibold">{user.name}</span> posted: {post.content || post.title}
+          <div className="space-y-4">
+            {userPosts.map(post => (
+              <div key={post._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 bg-gray-50">
+                
+                {/* Post Header: Avatar, Name, Title, Time */}
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 text-sm leading-tight hover:text-blue-600 cursor-pointer">
+                      {user.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-0.5">{user.tagline || 'GovNetwork Member'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Post Content */}
+                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {post.content || post.title}
+                </p>
+
+                {/* Post Actions (Visual Only for now) */}
+                <div className="border-t border-gray-200 mt-4 pt-3 flex gap-6 text-gray-500 text-sm font-medium">
+                  <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
+                    <span className="text-lg">👍</span> Like
+                  </button>
+                  <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
+                    <span className="text-lg">💬</span> Comment
+                  </button>
+                  <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
+                    <span className="text-lg">🔁</span> Repost
+                  </button>
+                </div>
+
               </div>
             ))}
           </div>
         ) : (
-          <p className="text-sm text-gray-500">You haven't posted anything yet.</p>
+          <p className="text-sm text-gray-500 italic">You haven't posted anything yet.</p>
         )}
       </div>
 
