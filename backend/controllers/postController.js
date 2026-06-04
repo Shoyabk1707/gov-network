@@ -83,4 +83,27 @@ const likePost = async (req, res) => {
   }
 };
 
+// 4. Delete a post (Personal or Page Post)
+const deletePost = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
+
+    // Security Check: Only the creator of the post can delete it
+    if (post.user.toString() !== currentUserId) {
+      return res.status(401).json({ message: 'User not authorized to delete this post' });
+    }
+
+    await post.deleteOne();
+    res.json({ message: 'Post removed successfully', postId: req.params.id });
+  } catch (error) {
+    console.error('Delete Post Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 module.exports = { createPost, getPosts, likePost };

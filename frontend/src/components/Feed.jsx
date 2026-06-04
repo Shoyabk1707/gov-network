@@ -87,6 +87,26 @@ export default function Feed() {
     }
   };
 
+  const handleDelete = async (postId) => {
+    if (!window.confirm("Are you sure you want to delete this notice?")) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        // 🔥 INSTANT LOCAL UPDATE: State se us post ko hata do bina refresh kiye
+        setPosts((prevPosts) => prevPosts.filter(post => post._id !== postId));
+      } else {
+        alert("Failed to delete post.");
+      }
+    } catch (err) {
+      console.error("Delete Error:", err);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto mt-8 px-4">
       {/* Create Post Form */}
@@ -127,23 +147,37 @@ export default function Feed() {
       {/* Timeline Feed */}
       <div className="space-y-4">
         {posts.map(post => (
-          <div key={post._id} className="bg-white p-5 rounded-lg shadow border-l-4 border-blue-500">
-            <div className="flex justify-between items-start mb-2">
-              <div>
-                <h4 className="font-bold text-gray-900 text-lg">{post.title}</h4>
-                {post.page ? (
-                  <p className="text-xs font-bold text-purple-700 flex items-center gap-1 mt-0.5">
-                    🏢 {post.page.name} <span className="text-gray-400 font-normal">({post.page.category})</span>
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    By {post.user?.name} ({post.user?.jobTitle}) • {post.user?.department}
-                  </p>
-                )}
-              </div>
-              <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{post.category}</span>
-            </div>
-            <p className="text-gray-700 text-sm whitespace-pre-line">{post.content}</p>
+          <div key={post._id} className="bg-white p-5 rounded-lg shadow border-l-4 border-blue-500 relative">
+  <div className="flex justify-between items-start mb-2">
+    <div>
+      <h4 className="font-bold text-gray-900 text-lg">{post.title}</h4>
+      {post.page ? (
+        <p className="text-xs font-bold text-purple-700 flex items-center gap-1 mt-0.5">
+          🏢 {post.page.name} <span className="text-gray-400 font-normal">({post.page.category})</span>
+        </p>
+      ) : (
+        <p className="text-xs text-gray-500 mt-0.5">
+          By {post.user?.name} ({post.user?.jobTitle}) • {post.user?.department}
+        </p>
+      )}
+    </div>
+    
+    <div className="flex items-center space-x-2">
+      <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{post.category}</span>
+      
+      {/* 🗑️ DELETE BUTTON: Sirf author ko dikhega (Agar token hai aur post.user._id match kare) */}
+      {/* Note: Kuch schemas me direct post.user hota hai ya post.user._id, aapke current getPosts me pure populate hai to post.user?._id use hoga */}
+      <button 
+        onClick={() => handleDelete(post._id)}
+        className="text-gray-400 hover:text-red-500 transition text-sm p-1"
+        title="Delete Notice"
+      >
+        🗑️
+      </button>
+    </div>
+  </div>
+  
+  <p className="text-gray-700 text-sm whitespace-pre-line">{post.content}</p>
             <div className="mt-4 pt-3 border-t flex items-center">
               <button 
                 onClick={() => handleLike(post._id)}
