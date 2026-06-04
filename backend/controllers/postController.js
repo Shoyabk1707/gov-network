@@ -24,6 +24,7 @@ const createPost = async (req, res) => {
                                     .populate('user', 'name role')
                                     .populate('page', 'name category'); // Also pull brand name if it's a page post
 
+    console.log("📡 BACKEND SENDING THIS NEW POST DATA:", populatedPost);
     res.status(201).json(populatedPost);
   } catch (error) {
     console.error('Create Post Error:', error.message);

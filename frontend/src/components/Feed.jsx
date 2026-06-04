@@ -62,16 +62,19 @@ export default function Feed() {
       });
       
       if (res.ok) {
-        setTitle(''); 
-        setContent('');
-        setSelectedIdentity('personal'); // Reset back to personal account after posting
-        fetchPosts(); // Refresh timeline instantly
-      }
+    const newPostData = await res.json(); 
+    console.log("🔥 FRONTEND RECEIVED THIS NEW POST DATA:", newPostData);
+
+    setPosts((prevPosts) => [newPostData, ...prevPosts]);
+
+    setTitle(''); 
+    setContent('');
+    setSelectedIdentity('personal'); 
+    }
     } catch (err) {
       console.error(err);
     }
   };
-
   const handleLike = async (postId) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
