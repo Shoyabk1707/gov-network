@@ -19,9 +19,9 @@ const createPost = async (req, res) => {
 
     const newPost = await Post.create(postData);
 
-    // 3. Populate user info so the frontend receives author names instantly
-    const populatedPost = await Post.findById(newPage._id)
-                                    .populate('user', 'name role')
+    // 3. ✨ FIXED TYPO: Changed newPage._id to newPost._id AND added jobTitle, department
+    const populatedPost = await Post.findById(newPost._id)
+                                    .populate('user', 'name role jobTitle department')
                                     .populate('page', 'name category'); // Also pull brand name if it's a page post
 
     console.log("📡 BACKEND SENDING THIS NEW POST DATA:", populatedPost);
@@ -42,7 +42,6 @@ const getPosts = async (req, res) => {
     console.log("---- FEED ALGORITHM RUNNING WITH PAGES ----");
 
     // Abhi ke liye hum saari posts dikhayenge taaki brand pages ki notifications har aspirant/user ko instantly timeline par mile
-    // Aur isme .populate('page') jodiye taaki frontend ko page ka name mil sake!
     const posts = await Post.find({})
                             .populate('user', 'name role jobTitle department') // Grabs user details
                             .populate('page', 'name category')                 // ✨ DETECT & POPULATE THE INSTUTUTE PAGE
