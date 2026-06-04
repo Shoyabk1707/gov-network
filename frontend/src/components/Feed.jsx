@@ -6,6 +6,8 @@ export default function Feed() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('General');
+  const [myPages, setMyPages] = useState([]);
+  const [selectedIdentity, setSelectedIdentity] = useState('personal');
   const token = localStorage.getItem('token');
 
   // Fetch all posts from backend
@@ -23,7 +25,25 @@ export default function Feed() {
 
   useEffect(() => { fetchPosts(); }, []);
 
- // Handle publishing a new post
+  useEffect(() => {
+    const fetchMyPages = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE_URL}/api/pages/my-pages`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMyPages(data);
+        }
+      } catch (err) {
+        console.error("Error loading pages for selector:", err);
+      }
+    };
+    fetchMyPages();
+  }, []);
+
+  // Handle publishing a new post
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -33,14 +53,18 @@ export default function Feed() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}` 
         },
-        // 👇 THIS IS THE FIXED LINE 👇
-        body: JSON.stringify({ title, content, category }) 
+        body: JSON.stringify({
+          title,
+          content,
+          category,
+          pageId: selectedIdentity === 'personal' ? null : selectedIdentity 
+        }) 
       });
       
       if (res.ok) {
         setTitle(''); 
         setContent('');
-        // Optional: setCategory('General') if you want to reset the dropdown
+        setSelectedIdentity('personal'); // Reset back to personal account after posting
         fetchPosts(); // Refresh timeline instantly
       }
     } catch (err) {
@@ -54,7 +78,7 @@ export default function Feed() {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) fetchPosts(); // Refresh timeline to update count
+      if (res.ok) fetchPosts(); 
     } catch (err) {
       console.error(err);
     }
@@ -65,6 +89,26 @@ export default function Feed() {
       {/* Create Post Form */}
       <form onSubmit={handleSubmit} className="bg-white p-4 rounded-lg shadow mb-6 space-y-3">
         <h3 className="text-lg font-bold text-gray-700">Broadcast an Official Notice</h3>
+        
+        {/* Identity Selector Dropdown */}
+        <div className="mb-4">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+            Post As
+          </label>
+          <select
+            value={selectedIdentity}
+            onChange={(e) => setSelectedIdentity(e.target.value)}
+            className="w-full border border-gray-300 bg-gray-50 rounded px-3 py-2 text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="personal">👤 My Personal Profile</option>
+            {myPages.map(page => (
+              <option key={page._id} value={page._id}>
+                🏢 {page.name} ({page.category})
+              </option>
+            ))}
+          </select>
+        </div>
+
         <input type="text" placeholder="Notice Title" value={title} onChange={e => setTitle(e.target.value)} className="w-full p-2 border rounded text-sm" required />
         <textarea placeholder="Write official communication here..." value={content} onChange={e => setContent(e.target.value)} className="w-full p-2 border rounded text-sm h-20" required />
         <div className="flex justify-between items-center">
@@ -84,7 +128,15 @@ export default function Feed() {
             <div className="flex justify-between items-start mb-2">
               <div>
                 <h4 className="font-bold text-gray-900 text-lg">{post.title}</h4>
-                <p className="text-xs text-gray-500">By {post.user?.name} ({post.user?.jobTitle}) • {post.user?.department}</p>
+                {post.page ? (
+                  <p className="text-xs font-bold text-purple-700 flex items-center gap-1 mt-0.5">
+                    🏢 {post.page.name} <span className="text-gray-400 font-normal">({post.page.category})</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    By {post.user?.name} ({post.user?.jobTitle}) • {post.user?.department}
+                  </p>
+                )}
               </div>
               <span className="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">{post.category}</span>
             </div>
