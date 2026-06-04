@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const { createPost, getPosts, likePost } = require('../controllers/postController'); 
+// 1. FIXED: Added deletePost inside the controller destructuring array
+const { createPost, getPosts, likePost, deletePost } = require('../controllers/postController'); 
 const protect = require('../middleware/authMiddleware');
 
 router.post('/', protect, createPost);
 router.get('/', protect, getPosts);
 router.put('/:id/like', protect, likePost); 
-router.delete('/:id', authMiddleware, deletePost);
+// 2. FIXED: Changed authMiddleware to protect, so it matches the top import
+router.delete('/:id', protect, deletePost);
 
 module.exports = router;

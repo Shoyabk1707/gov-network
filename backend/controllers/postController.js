@@ -4,25 +4,22 @@ const User = require('../models/User');
 // Create a new post (Personal OR Page Post)
 const createPost = async (req, res) => {
   try {
-    // 1. Destructure pageId along with title, content, and category
     const { title, content, category, pageId } = req.body;
     const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
 
-    // 2. Build the database object payload
     const postData = {
-      user: currentUserId, // Author remains the authenticated user
+      user: currentUserId, 
       title,
       content,
       category,
-      page: pageId ? pageId : null // If pageId is provided, link it. Otherwise, personal post.
+      page: pageId ? pageId : null 
     };
 
     const newPost = await Post.create(postData);
 
-    // 3. ✨ FIXED TYPO: Changed newPage._id to newPost._id AND added jobTitle, department
     const populatedPost = await Post.findById(newPost._id)
                                     .populate('user', 'name role jobTitle department')
-                                    .populate('page', 'name category'); // Also pull brand name if it's a page post
+                                    .populate('page', 'name category'); 
 
     console.log("📡 BACKEND SENDING THIS NEW POST DATA:", populatedPost);
     res.status(201).json(populatedPost);
@@ -41,10 +38,9 @@ const getPosts = async (req, res) => {
     
     console.log("---- FEED ALGORITHM RUNNING WITH PAGES ----");
 
-    // Abhi ke liye hum saari posts dikhayenge taaki brand pages ki notifications har aspirant/user ko instantly timeline par mile
     const posts = await Post.find({})
-                            .populate('user', 'name role jobTitle department') // Grabs user details
-                            .populate('page', 'name category')                 // ✨ DETECT & POPULATE THE INSTUTUTE PAGE
+                            .populate('user', 'name role jobTitle department') 
+                            .populate('page', 'name category')                 
                             .sort({ createdAt: -1 });
 
     console.log(`Successfully found ${posts.length} total posts on timeline.`);
@@ -62,7 +58,6 @@ const likePost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    // FIX: If the old post doesn't have a likes array yet, create it empty
     if (!post.likes) {
       post.likes = [];
     }
@@ -83,7 +78,7 @@ const likePost = async (req, res) => {
   }
 };
 
-// 4. Delete a post (Personal or Page Post) - FIXED SECURITY MATCH
+// 4. Delete a post (NATIVE MONGOOSE EQUALS MATCH)
 const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -91,15 +86,15 @@ const deletePost = async (req, res) => {
       return res.status(404).json({ message: 'Post not found' });
     }
 
-    const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
+    const currentUserDoc = req.user._id ? req.user._id : (req.user.id ? req.user.id : req.user);
+    const postAuthorDoc = post.user._id ? post.user._id : post.user;
 
-    // ✨ BULLETPROOF MATCH: Extracted nested ID handle checking if user field is populated object or raw ObjectId string
-    const postAuthorId = post.user._id ? post.user._id.toString() : post.user.toString();
+    console.log("--- DEBUGGING DELETE MATCH ---");
+    const isAuthorized = postAuthorDoc.toString() === currentUserDoc.toString();
+    console.log("Is Authorized Outcome:", isAuthorized);
+    console.log("------------------------------");
 
-    console.log("Comparing IDs -> Author:", postAuthorId, " | LoggedIn:", currentUserId);
-
-    // Security Check
-    if (postAuthorId !== currentUserId) {
+    if (!isAuthorized) {
       return res.status(401).json({ message: 'User not authorized to delete this post' });
     }
 
@@ -111,4 +106,5 @@ const deletePost = async (req, res) => {
   }
 };
 
-module.exports = { createPost, getPosts, likePost };
+// ✨ FIXED: Added deletePost in exports array here!
+module.exports = { createPost, getPosts, likePost, deletePost };
