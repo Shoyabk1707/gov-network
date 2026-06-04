@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 
 export default function Feed() {
@@ -12,6 +13,7 @@ export default function Feed() {
   const [commentText, setCommentText] = useState({});
   const [activeCommentPost, setActiveCommentPost] = useState(null); 
   const [copiedPostId, setCopiedPostId] = useState(null);
+  const navigate = useNavigate();
 
 
   // Fetch all posts from backend
@@ -225,7 +227,13 @@ export default function Feed() {
           <div key={post._id} className="bg-white p-5 rounded-lg shadow border-l-4 border-blue-500 relative">
   <div className="flex justify-between items-start mb-2">
     <div>
-      <h4 className="font-bold text-gray-900 text-lg">{post.title}</h4>
+      <h4 
+        onClick={() => navigate(`/post/${post._id}`)}
+        className="font-bold text-gray-900 text-lg cursor-pointer hover:text-blue-600 hover:underline transition"
+        title="Click to view full discussion"
+        >
+        {post.title}
+      </h4>
       {post.page ? (
         <p className="text-xs font-bold text-purple-700 flex items-center gap-1 mt-0.5">
           🏢 {post.page.name} <span className="text-gray-400 font-normal">({post.page.category})</span>

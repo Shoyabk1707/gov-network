@@ -144,5 +144,27 @@ const addComment = async (req, res) => {
   }
 };
 
+// 6. Get a single post by ID (For shared links & single view)
+const getPostById = async (req, res) => {
+  try {
+    const post = await Post.findById(req.params.id)
+                            .populate('user', 'name role jobTitle department')
+                            .populate('page', 'name category')
+                            .populate('comments.user', 'name role jobTitle department');
+
+    if (!post) {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+
+    res.json(post);
+  } catch (error) {
+    console.error('Get Single Post Error:', error.message);
+    if (error.kind === 'ObjectId') {
+      return res.status(404).json({ message: 'Notice not found' });
+    }
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 // ✨ FIXED: Added deletePost in exports array here!
-module.exports = { createPost, getPosts, likePost, deletePost, addComment };
+module.exports = { createPost, getPosts, likePost, deletePost, addComment, getPostById };
