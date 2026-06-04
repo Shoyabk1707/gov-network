@@ -83,7 +83,7 @@ const likePost = async (req, res) => {
   }
 };
 
-// 4. Delete a post (Personal or Page Post)
+// 4. Delete a post (Personal or Page Post) - FIXED SECURITY MATCH
 const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
@@ -93,8 +93,13 @@ const deletePost = async (req, res) => {
 
     const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
 
-    // Security Check: Only the creator of the post can delete it
-    if (post.user.toString() !== currentUserId) {
+    // ✨ BULLETPROOF MATCH: Extracted nested ID handle checking if user field is populated object or raw ObjectId string
+    const postAuthorId = post.user._id ? post.user._id.toString() : post.user.toString();
+
+    console.log("Comparing IDs -> Author:", postAuthorId, " | LoggedIn:", currentUserId);
+
+    // Security Check
+    if (postAuthorId !== currentUserId) {
       return res.status(401).json({ message: 'User not authorized to delete this post' });
     }
 
