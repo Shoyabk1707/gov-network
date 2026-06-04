@@ -41,6 +41,7 @@ const getPosts = async (req, res) => {
     const posts = await Post.find({})
                             .populate('user', 'name role jobTitle department') 
                             .populate('page', 'name category')                 
+                            .populate('comments.user', 'name role jobTitle department')
                             .sort({ createdAt: -1 });
 
     console.log(`Successfully found ${posts.length} total posts on timeline.`);
@@ -106,5 +107,42 @@ const deletePost = async (req, res) => {
   }
 };
 
+// 5. Add a comment to a post
+const addComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ message: 'Comment text is required' });
+    }
+
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
+
+    // Naya comment ka object array me push karo
+    const newComment = {
+      user: currentUserId,
+      text: text
+    };
+
+    post.comments.push(newComment);
+    await post.save();
+
+    // Freshly updated post ko poore comment users ke 'name role' ke sath populate karo
+    const updatedPost = await Post.findById(req.params.id)
+                                  .populate('user', 'name role jobTitle department')
+                                  .populate('page', 'name category')
+                                  .populate('comments.user', 'name role jobTitle department'); // ✨ Comment karne wale ka data
+
+    res.json(updatedPost.comments); // Sirf updated comments ka array return karenge frontend ko
+  } catch (error) {
+    console.error('Comment Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 // ✨ FIXED: Added deletePost in exports array here!
-module.exports = { createPost, getPosts, likePost, deletePost };
+module.exports = { createPost, getPosts, likePost, deletePost, addComment };

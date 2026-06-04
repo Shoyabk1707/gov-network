@@ -8,7 +8,7 @@ const postSchema = new mongoose.Schema({
   },
   page: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Page", // 
+    ref: "Page", 
     default: null, 
   },
   title: {
@@ -27,6 +27,24 @@ const postSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
   }],
+  // 💬 NEW: Comments Array Added
+  comments: [
+    {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User', // Kisne comment kiya
+        required: true
+      },
+      text: {
+        type: String, // Kya comment kiya
+        required: true
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now // Kab comment kiya
+      }
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now,

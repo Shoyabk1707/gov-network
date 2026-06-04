@@ -9,6 +9,8 @@ export default function Feed() {
   const [myPages, setMyPages] = useState([]);
   const [selectedIdentity, setSelectedIdentity] = useState('personal');
   const token = localStorage.getItem('token');
+  const [commentText, setCommentText] = useState({});
+  const [activeCommentPost, setActiveCommentPost] = useState(null); 
 
   // Fetch all posts from backend
   const fetchPosts = async () => {
@@ -107,6 +109,41 @@ export default function Feed() {
     }
   };
 
+  const handleCommentSubmit = async (e, postId) => {
+    e.preventDefault();
+    const textStr = commentText[postId]?.trim();
+    if (!textStr) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/comment`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ text: textStr })
+      });
+
+      if (res.ok) {
+        const updatedCommentsArray = await res.json();
+
+        // 🔥 INSTANT RE-RENDER: Find the post locally and update its comments array instantly
+        setPosts((prevPosts) => 
+          prevPosts.map(post => 
+            post._id === postId ? { ...post, comments: updatedCommentsArray } : post
+          )
+        );
+
+        // Clear the input box for this specific post
+        setCommentText(prev => ({ ...prev, [postId]: '' }));
+      } else {
+        alert("Failed to add comment.");
+      }
+    } catch (err) {
+      console.error("Comment submit error:", err);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto mt-8 px-4">
       {/* Create Post Form */}
@@ -178,7 +215,9 @@ export default function Feed() {
   </div>
   
   <p className="text-gray-700 text-sm whitespace-pre-line">{post.content}</p>
-            <div className="mt-4 pt-3 border-t flex items-center">
+            {/* --- ACTION BUTTONS (LIKE & COMMENT TOGGLE) --- */}
+            <div className="mt-4 pt-3 border-t flex items-center space-x-6">
+              {/* Like Button */}
               <button 
                 onClick={() => handleLike(post._id)}
                 className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1"
@@ -186,7 +225,65 @@ export default function Feed() {
                 <span>👍</span>
                 <span>{post.likes?.length || 0} Likes</span>
               </button>
+
+              {/* Comment Toggle Button */}
+              <button 
+                onClick={() => setActiveCommentPost(activeCommentPost === post._id ? null : post._id)}
+                className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1"
+              >
+                <span>💬</span>
+                <span>{post.comments?.length || 0} Comments</span>
+              </button>
             </div>
+
+            {/* --- COLLAPSIBLE ACCORDION COMMENT SECTION --- */}
+            {activeCommentPost === post._id && (
+              <div className="mt-4 pt-4 border-t bg-gray-50 p-3 rounded-lg space-y-3 transition-all">
+                
+                {/* 1. Comments List */}
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {post.comments && post.comments.length > 0 ? (
+                    post.comments.map((comment) => (
+                      <div key={comment._id} className="bg-white p-2.5 rounded border text-xs shadow-sm">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="font-bold text-gray-800">
+                            👤 {comment.user?.name || "Unknown User"} 
+                            <span className="text-gray-400 font-normal ml-1">
+                              ({comment.user?.jobTitle || "Member"})
+                            </span>
+                          </span>
+                          <span className="text-[10px] text-gray-400">
+                            {new Date(comment.createdAt).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <p className="text-gray-700 whitespace-pre-line">{comment.text}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-gray-400 italic text-center py-2">No comments yet. Be the first to start the discussion!</p>
+                  )}
+                </div>
+
+                {/* 2. Add Comment Input Box Form */}
+                <form onSubmit={(e) => handleCommentSubmit(e, post._id)} className="flex items-center gap-2 mt-2">
+                  <input 
+                    type="text" 
+                    placeholder="Write a professional reply..." 
+                    value={commentText[post._id] || ''} 
+                    onChange={(e) => setCommentText(prev => ({ ...prev, [post._id]: e.target.value }))}
+                    className="flex-1 p-2 border rounded-md text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    required 
+                  />
+                  <button 
+                    type="submit" 
+                    className="bg-blue-600 text-white px-3 py-2 rounded-md text-xs font-bold hover:bg-blue-700 transition"
+                  >
+                    Reply
+                  </button>
+                </form>
+
+              </div>
+            )}
           </div>
         ))}
       </div>
