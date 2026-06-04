@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '../config';
 
 function SinglePostView() {
   const { id } = useParams(); // URL se post ID extract karega -> /post/:id
@@ -14,10 +15,17 @@ function SinglePostView() {
   const API_BASE_URL = "https://gov-network-backend.vercel.app"; // Apne exact backend domain se match kar lena bhai
 
   // 📡 FETCH THE SINGLE TARGETED POST
+// 📡 FETCH THE SINGLE TARGETED POST
   useEffect(() => {
     const fetchSinglePost = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/posts/${id}`);
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const res = await fetch(`${API_BASE_URL}/api/posts/${id}`, { headers });
+        
         if (!res.ok) {
           throw new Error("Notice not found or deleted by admin.");
         }
@@ -31,8 +39,10 @@ function SinglePostView() {
       }
     };
 
-    fetchSinglePost();
-  }, [id]);
+    if (id) {
+      fetchSinglePost();
+    }
+  }, [id, token]);
 
   // 💬 HANDLER FOR DIRECT COMMENTING FROM THIS VIEW
   const handleCommentSubmit = async (e) => {
