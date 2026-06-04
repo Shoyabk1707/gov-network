@@ -11,6 +11,8 @@ export default function Feed() {
   const token = localStorage.getItem('token');
   const [commentText, setCommentText] = useState({});
   const [activeCommentPost, setActiveCommentPost] = useState(null); 
+  const [copiedPostId, setCopiedPostId] = useState(null);
+
 
   // Fetch all posts from backend
   const fetchPosts = async () => {
@@ -144,6 +146,42 @@ export default function Feed() {
     }
   };
 
+  const handleShare = async (post) => {
+    // Generate a clean post URL based on your deployment or localhost URL
+    const postUrl = `${window.location.origin}/post/${post._id}`;
+    
+    // Title & text payload for sharing
+    const shareData = {
+      title: post.title || 'Check out this notice!',
+      text: post.content ? `${post.content.substring(0, 100)}...` : '',
+      url: postUrl
+    };
+
+    // 1. Mobile Premium Feel: If Native Web Share API is available, use it!
+    if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
+      try {
+        await navigator.share(shareData);
+        return; // Native share opened successfully
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error("Native share failed, falling back to clipboard:", err);
+        }
+      }
+    }
+
+    // 2. Universal Fallboard: Agar desktop browser hai ya native share fail hua, toh link clipboard me copy karo
+    try {
+      await navigator.clipboard.writeText(postUrl);
+      
+      // Flash a temporary "Copied!" notification on that specific post icon for 2 seconds
+      setCopiedPostId(post._id);
+      setTimeout(() => setCopiedPostId(null), 2000);
+    } catch (err) {
+      console.error("Could not copy text to clipboard: ", err);
+      alert("Failed to copy link.");
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto mt-8 px-4">
       {/* Create Post Form */}
@@ -216,6 +254,7 @@ export default function Feed() {
   
   <p className="text-gray-700 text-sm whitespace-pre-line">{post.content}</p>
             {/* --- ACTION BUTTONS (LIKE & COMMENT TOGGLE) --- */}
+            {/* --- ACTION BUTTONS (LIKE, COMMENT & SHARE) --- */}
             <div className="mt-4 pt-3 border-t flex items-center space-x-6">
               {/* Like Button */}
               <button 
@@ -233,6 +272,16 @@ export default function Feed() {
               >
                 <span>💬</span>
                 <span>{post.comments?.length || 0} Comments</span>
+              </button>
+
+              {/* 🔗 Share Button */}
+              <button 
+                onClick={() => handleShare(post)}
+                className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1 relative"
+                title="Share Notice"
+              >
+                <span>🔗</span>
+                <span>{copiedPostId === post._id ? "Copied! ✅" : "Share"}</span>
               </button>
             </div>
 
