@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-// ✨ NEW: Imported structural route components from react-router-dom
+import { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import Register from './components/Register';
 import Login from './components/Login';
@@ -10,130 +9,80 @@ import CreatorProfile from './components/CreatorProfile';
 import ManagePages from './components/ManagePages';
 import SinglePostView from './components/SinglePostView';
 
-// 🔗 Temporary Placeholder for Single Post View so share links don't throw 404
-const SinglePostViewPlaceholder = () => {
-  return (
-    <div className="max-w-2xl mx-auto mt-10 bg-white p-6 rounded-lg shadow border text-center">
-      <h2 className="text-xl font-bold text-gray-800">Post View System Initializing</h2>
-      <p className="text-sm text-gray-500 mt-2">Hum jaldi hi is page ka functional code bana kar replace karenge!</p>
-    </div>
-  );
-};
-
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // 🔥 FIX 1: Synchronous token check! Isse naye tab me load hone par race condition nahi aayegi.
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   const [showLogin, setShowLogin] = useState(true);
   
-  // ✨ React Router hooks for handling redirection and current active track path
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setIsAuthenticated(true);
-    }
-  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     setIsAuthenticated(false);
-    navigate('/login'); // Redirect instantly to login route
+    navigate('/login');
   };
 
-  // Safe wrapper check to bounce unauthenticated traffic back to login path
   const ProtectedRoute = ({ children }) => {
     return isAuthenticated ? children : <Navigate to="/login" replace />;
   };
 
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-100">
-        
-        {/* --- NAVIGATION BAR (ROUTER UPGRADED) --- */}
-        <nav className="bg-white shadow-sm border-b p-4 flex justify-between items-center mb-6 px-4 md:px-10">
-          <h1 
-            onClick={() => navigate('/')}
-            className="text-2xl font-bold text-blue-600 cursor-pointer"
-          >
-            GovNetwork
-          </h1>
-          
-          <div className="flex gap-6 items-center font-medium text-gray-700">
-            <button 
-              onClick={() => navigate('/')} 
-              className={location.pathname === '/' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
-            >
-              Feed
-            </button>
-            <button 
-              onClick={() => navigate('/network')} 
-              className={location.pathname.startsWith('/network') || location.pathname.startsWith('/creator') ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
-            >
-              Network
-            </button>
-            <button 
-              onClick={() => navigate('/pages')} 
-              className={location.pathname === '/pages' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
-            >
-              Pages
-            </button>
-            <button 
-              onClick={() => navigate('/profile')} 
-              className={location.pathname === '/profile' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}
-            >
-              Profile
-            </button>
-            <button 
-              onClick={handleLogout} 
-              className="text-red-500 hover:bg-red-50 px-3 py-1 rounded transition"
-            >
-              Logout
-            </button>
-          </div>
-        </nav>
-
-        {/* --- 🏁 DECLARATIVE ROUTING ENGINE GRID --- */}
-        <div>
-          <Routes>
-            {/* Main feed endpoint guarded */}
-            <Route path="/" element={<ProtectedRoute><Dashboard onLogout={handleLogout} /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/network" element={<ProtectedRoute><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></ProtectedRoute>} />
-            <Route path="/creator/:userId" element={<ProtectedRoute><CreatorProfileWrapper /></ProtectedRoute>} />
-            <Route path="/pages" element={<ProtectedRoute><ManagePages onBack={() => navigate('/')} /></ProtectedRoute>} />
-            
-            {/* 🔗 THE MAGIC LINK ROUTE: Publicly accessible isolated wrapper */}
-            <Route path="/post/:id" element={<SinglePostView />} />            
-            {/* Fallback route redirection control */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+  // 🌍 UI components wrapper for logged-in users (Navbar etc)
+  const AuthenticatedLayout = ({ children }) => (
+    <div className="min-h-screen bg-gray-100">
+      <nav className="bg-white shadow-sm border-b p-4 flex justify-between items-center mb-6 px-4 md:px-10">
+        <h1 onClick={() => navigate('/')} className="text-2xl font-bold text-blue-600 cursor-pointer">
+          GovNetwork
+        </h1>
+        <div className="flex gap-6 items-center font-medium text-gray-700">
+          <button onClick={() => navigate('/')} className={location.pathname === '/' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}>Feed</button>
+          <button onClick={() => navigate('/network')} className={location.pathname.startsWith('/network') || location.pathname.startsWith('/creator') ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}>Network</button>
+          <button onClick={() => navigate('/pages')} className={location.pathname === '/pages' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}>Pages</button>
+          <button onClick={() => navigate('/profile')} className={location.pathname === '/profile' ? "text-blue-600 border-b-2 border-blue-600 pb-1" : "hover:text-blue-600 pb-1"}>Profile</button>
+          <button onClick={handleLogout} className="text-red-500 hover:bg-red-50 px-3 py-1 rounded transition">Logout</button>
         </div>
-      </div>
-    );
-  }
+      </nav>
+      {children}
+    </div>
+  );
 
-  // Auth screen routes (Login/Register template)
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-      <Routes>
-        <Route path="/login" element={showLogin ? <Login setIsAuthenticated={setIsAuthenticated} /> : <Navigate to="/register" replace />} />
-        <Route path="/register" element={!showLogin ? <Register /> : <Navigate to="/login" replace />} />
-        {/* Dynamic traffic catch */}
-        <Route path="*" element={
-          <div className="flex flex-col items-center">
+    <Routes>
+      {/* 🚀 FIX 2: PUBLIC ROUTE (Bina login wale bhi dekh payenge, aur logged in wale bhi) */}
+      <Route path="/post/:id" element={
+        isAuthenticated ? (
+          <AuthenticatedLayout><SinglePostView /></AuthenticatedLayout>
+        ) : (
+          <div className="min-h-screen bg-gray-100 py-10"><SinglePostView /></div>
+        )
+      } />
+
+      {/* --- AUTHENTICATED ROUTES --- */}
+      <Route path="/" element={<ProtectedRoute><AuthenticatedLayout><Dashboard onLogout={handleLogout} /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout><Profile /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
+      <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
+
+      {/* --- UNAUTHENTICATED ROUTES (Login/Register) --- */}
+      <Route path="/login" element={
+        !isAuthenticated ? (
+          <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
             {showLogin ? <Login setIsAuthenticated={setIsAuthenticated} /> : <Register />}
             <button onClick={() => setShowLogin(!showLogin)} className="mt-4 text-blue-600 underline">
               {showLogin ? "Need an account? Register here." : "Already have an account? Login here."}
             </button>
           </div>
-        } />
-      </Routes>
-    </div>
+        ) : <Navigate to="/" replace />
+      } />
+      
+      {/* Fallback Route */}
+      <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
+    </Routes>
   );
 }
 
-// 📦 Helper wrapper to extract params from URL inside route mapping seamlessly
+// Helper wrapper for CreatorProfile
 import { useParams } from 'react-router-dom';
 const CreatorProfileWrapper = () => {
   const { userId } = useParams();
