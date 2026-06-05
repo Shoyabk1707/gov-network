@@ -9,15 +9,15 @@ const app = express();
 // Connect Database
 connectDB();
 
-// 🌐 PREMIUM CONFIGURATION FOR CORS & PREFLIGHT OPTIONS
+// 🌐 PREMIUM CONFIGURATION FOR CORS
 const allowedOrigins = [
-  'http://localhost:5173',          // Local frontend testing
-  'https://gov-network.vercel.app'  // Aapka live vercel frontend link
+  'http://localhost:5173',          
+  'https://gov-network.vercel.app'  
 ];
 
+// Ye akela block hi kaafi hai saare Preflight aur CORS handle karne ke liye
 app.use(cors({
   origin: function (origin, callback) {
-    // Allows requests with no origin (like mobile apps, postman, or curls)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
@@ -26,12 +26,9 @@ app.use(cors({
     return callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // OPTIONS header allow hona compulsory hai!
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-// ✨ HANDLE PREFLIGHT REQUESTS GLOBALLY FOR ALL ROUTES
-app.options('*', cors());
 
 app.use(express.json());
 
