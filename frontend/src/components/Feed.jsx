@@ -201,16 +201,21 @@ export default function Feed() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
+      // 🚀 THE FIX: Data ko nikalna padega pehle!
+      const data = await res.json(); 
+
       if (res.ok) {
         toast.success(data.message); 
-        } else {
-        toast.error("Failed to save post.");
-        }
+      } else {
+        toast.error(data.message || "Failed to save post.");
+      }
     } catch (err) {
       console.error("Save Post Error:", err);
+      // Catch me bhi toast laga do taaki error chup na jaye
+      toast.error("Network error while saving."); 
     }
   };
-
+  
   return (
     <div className="max-w-2xl mx-auto mt-8 px-4">
       {/* Create Post Form */}
