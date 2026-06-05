@@ -5,7 +5,7 @@ import { Toaster } from 'react-hot-toast';
 // Components
 import Register from './components/Register';
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+import Feed from './components/Feed';
 import Profile from './components/Profile';
 import Network from './components/Network';
 import CreatorProfile from './components/CreatorProfile';
@@ -94,7 +94,7 @@ function App() {
         } />
 
         {/* --- AUTHENTICATED ROUTES --- */}
-        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Dashboard onLogout={handleLogout} /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed onLogout={handleLogout} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />

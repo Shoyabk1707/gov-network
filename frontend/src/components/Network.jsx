@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import SkeletonNetworkCard from './SkeletonNetworkCard';
 
 export default function Network({ onViewProfile }) { // <-- Add the prop here
   const [users, setUsers] = useState([]);
@@ -7,6 +8,7 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
   // NEW: State to track which buttons we've clicked during this session
   const [followedUsers, setFollowedUsers] = useState([]);
   const [requestedUsers, setRequestedUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
   
   const token = localStorage.getItem('token');
 
@@ -48,6 +50,9 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
       }
     } catch (err) {
       console.error(err);
+    }finally {
+      // 🚀 YEH LINE ADD KARNI HAI: API call pass ho ya fail, loading band kar do
+      setLoading(false);
     }
   };
 
@@ -90,6 +95,22 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
       console.error(err);
     }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto mt-6 px-4">
+        <h2 className="text-xl font-bold text-gray-900 mb-6">Discover Connections</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <SkeletonNetworkCard />
+          <SkeletonNetworkCard />
+          <SkeletonNetworkCard />
+          <SkeletonNetworkCard />
+          <SkeletonNetworkCard />
+          <SkeletonNetworkCard />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto mt-8 p-4">

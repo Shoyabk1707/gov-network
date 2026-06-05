@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import { Helmet } from 'react-helmet-async';
 
 function SinglePostView() {
   const { id } = useParams(); // URL se post ID extract karega -> /post/:id
@@ -92,6 +93,24 @@ function SinglePostView() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6">
+      <Helmet>
+          {/* Normal Browser Title */}
+          <title>{post.title} | GovNetwork</title>
+          
+          {/* Open Graph Tags for LinkedIn, WhatsApp, Facebook */}
+          <meta property="og:title" content={post.title} />
+          <meta property="og:description" content={post.content ? post.content.substring(0, 120) + '...' : 'Check out this notice on GovNetwork'} />
+          <meta property="og:type" content="article" />
+          <meta property="og:url" content={window.location.href} />
+          
+          {/* Optional: Agar koi default image lagani ho preview me */}
+          <meta property="og:image" content="https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg" /> 
+
+          {/* Twitter Card Tags */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={post.title} />
+          <meta name="twitter:description" content={post.content ? post.content.substring(0, 120) + '...' : ''} />
+        </Helmet>
       {/* Back to Home Navigator */}
       <button 
         onClick={() => navigate('/')} 

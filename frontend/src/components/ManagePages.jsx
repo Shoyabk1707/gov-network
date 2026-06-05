@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import SkeletonPageCard from './SkeletonPageCard';
 
 export default function ManagePages({ onBack }) {
   const [pages, setPages] = useState([]);
@@ -8,6 +9,7 @@ export default function ManagePages({ onBack }) {
   const [category, setCategory] = useState('Coaching Institute');
   const [bio, setBio] = useState('');
   const [showForm, setShowForm] = useState(false);
+  
 
   // 1. Fetch user's managed pages
   useEffect(() => {
@@ -109,7 +111,10 @@ export default function ManagePages({ onBack }) {
 
       {/* Pages List */}
       {loading ? (
-        <div>Loading your pages...</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <SkeletonPageCard />
+          <SkeletonPageCard />
+        </div>
       ) : pages.length === 0 ? (
         <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center text-gray-500">
           You don't own or manage any pages yet. Click "+ Create a Page" to start.

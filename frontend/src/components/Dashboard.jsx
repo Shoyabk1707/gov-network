@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Feed from './Feed';
 import { API_BASE_URL } from '../config';
+import SkeletonPost from './SkeletonPost';
 
 export default function Dashboard({ onLogout }) {
   const [user, setUser] = useState(null);
@@ -29,8 +30,28 @@ export default function Dashboard({ onLogout }) {
     fetchProfile();
   }, [onLogout]);
 
-  if (!user) return <div className="text-center mt-10">Loading profile...</div>;
+if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-100 pb-12 pt-6">
+        {/* 1. Dashboard Profile Card Skeleton */}
+        <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-md flex flex-col items-center animate-pulse mb-8">
+          <div className="h-8 bg-gray-300 rounded w-3/4 mb-4"></div> {/* Welcome Name */}
+          <div className="h-5 bg-blue-200 rounded w-1/2 mb-3"></div> {/* Job Title */}
+          <div className="h-4 bg-gray-200 rounded w-1/3 mb-6"></div> {/* Department */}
+          <div className="w-full border-t pt-4 flex flex-col items-center">
+            <div className="h-3 bg-gray-200 rounded w-1/2 mb-4"></div> {/* Email */}
+          </div>
+        </div>
 
+        {/* 2. Feed Posts Skeleton (Neeche ka space fill karne ke liye) */}
+        <div className="max-w-3xl mx-auto px-4">
+          <SkeletonPost />
+          <SkeletonPost />
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen bg-gray-100 pb-12">
       {/* Profile Card */}
