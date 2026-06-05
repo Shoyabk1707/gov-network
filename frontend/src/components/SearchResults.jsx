@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import SkeletonPost from './SkeletonPost';
 
 export default function SearchResults() {
   const [searchParams] = useSearchParams();
@@ -38,7 +39,17 @@ export default function SearchResults() {
     }
   }, [query, token]);
 
-  if (loading) return <div className="text-center py-10 text-gray-500 mt-10">Searching across GovNetwork...</div>;
+  
+
+ {/* if (loading) return <div className="text-center py-10 text-gray-500 mt-10">Searching across GovNetwork...</div>; */}
+
+ if (loading) return (
+  <div className="max-w-3xl mx-auto mt-6 px-4 space-y-4">
+    <SkeletonPost />
+    <SkeletonPost />
+    <SkeletonPost />
+  </div>
+);
 
   return (
     <div className="max-w-3xl mx-auto mt-6 px-4">

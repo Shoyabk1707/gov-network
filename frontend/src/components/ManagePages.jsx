@@ -58,7 +58,7 @@ export default function ManagePages({ onBack }) {
       } else {
         const errorText = await res.text();
         console.error("❌ 3. Backend Rejected Request:", errorText);
-        alert(`Backend Error! Status Code: ${res.status}\nMessage: ${errorText || 'Check server logs'}`);
+        toast.error(`Backend Error! Status Code: ${res.status}\nMessage: ${errorText || 'Check server logs'}`);
       }
     } catch (err) {
       console.error("💥 3. Network Connection Failed:", err);

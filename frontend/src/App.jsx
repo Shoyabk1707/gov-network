@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Routes, Route, useNavigate, useLocation, Navigate, useParams } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 
 // Components
 import Register from './components/Register';
@@ -79,41 +80,45 @@ function App() {
   };
 
   return (
-    <Routes>
-      {/* 🚀 PUBLIC ROUTE */}
-      <Route path="/post/:id" element={
-        isAuthenticated ? (
-          <AuthenticatedLayout handleLogout={handleLogout}><SinglePostView /></AuthenticatedLayout>
-        ) : (
-          <div className="min-h-screen bg-gray-100 py-10"><SinglePostView /></div>
-        )
-      } />
+    <>
+      <Toaster position="bottom-center" toastOptions={{ duration: 3000 }} />
 
-      {/* --- AUTHENTICATED ROUTES --- */}
-      <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Dashboard onLogout={handleLogout} /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
-      <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
-      
-      {/* 🔍 SEARCH ROUTE */}
-      <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
+      <Routes>
+        {/* 🚀 PUBLIC ROUTE */}
+        <Route path="/post/:id" element={
+          isAuthenticated ? (
+            <AuthenticatedLayout handleLogout={handleLogout}><SinglePostView /></AuthenticatedLayout>
+          ) : (
+            <div className="min-h-screen bg-gray-100 py-10"><SinglePostView /></div>
+          )
+        } />
 
-      {/* --- UNAUTHENTICATED ROUTES (Login/Register) --- */}
-      <Route path="/login" element={
-        !isAuthenticated ? (
-          <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-            {showLogin ? <Login setIsAuthenticated={setIsAuthenticated} /> : <Register />}
-            <button onClick={() => setShowLogin(!showLogin)} className="mt-4 text-blue-600 underline">
-              {showLogin ? "Need an account? Register here." : "Already have an account? Login here."}
-            </button>
-          </div>
-        ) : <Navigate to="/" replace />
-      } />
-      
-      {/* Fallback Route */}
-      <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
-    </Routes>
+        {/* --- AUTHENTICATED ROUTES --- */}
+        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Dashboard onLogout={handleLogout} /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
+        
+        {/* 🔍 SEARCH ROUTE */}
+        <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
+
+        {/* --- UNAUTHENTICATED ROUTES (Login/Register) --- */}
+        <Route path="/login" element={
+          !isAuthenticated ? (
+            <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
+              {showLogin ? <Login setIsAuthenticated={setIsAuthenticated} /> : <Register />}
+              <button onClick={() => setShowLogin(!showLogin)} className="mt-4 text-blue-600 underline">
+                {showLogin ? "Need an account? Register here." : "Already have an account? Login here."}
+              </button>
+            </div>
+          ) : <Navigate to="/" replace />
+        } />
+        
+        {/* Fallback Route */}
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
+      </Routes>
+    </>
   );
 }
 

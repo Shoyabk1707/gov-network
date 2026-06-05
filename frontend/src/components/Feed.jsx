@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import toast from 'react-hot-toast';
 
 export default function Feed() {
   const [posts, setPosts] = useState([]);
@@ -105,11 +106,16 @@ export default function Feed() {
       if (res.ok) {
         // 🔥 INSTANT LOCAL UPDATE: State se us post ko hata do bina refresh kiye
         setPosts((prevPosts) => prevPosts.filter(post => post._id !== postId));
+        
+        // ✨ NAYA: Success Toast
+        toast.success("Notice deleted successfully! 🗑️");
       } else {
-        alert("Failed to delete post.");
+        toast.error("Failed to delete notice.");
       }
     } catch (err) {
       console.error("Delete Error:", err);
+      // 🔴 UPDATE: Catch block me bhi error dikhao
+      toast.error("Network error while deleting.");
     }
   };
 
@@ -140,11 +146,16 @@ export default function Feed() {
 
         // Clear the input box for this specific post
         setCommentText(prev => ({ ...prev, [postId]: '' }));
+
+        // ✨ NAYA: Success Toast (Optional but gives good feel)
+        toast.success("Comment added! 💬");
       } else {
-        alert("Failed to add comment.");
+        toast.error("Failed to add comment.");
       }
     } catch (err) {
       console.error("Comment submit error:", err);
+      // 🔴 UPDATE: Catch block me bhi error dikhao
+      toast.error("Network error while commenting.");
     }
   };
 
@@ -174,13 +185,12 @@ export default function Feed() {
     // 2. Universal Fallboard: Agar desktop browser hai ya native share fail hua, toh link clipboard me copy karo
     try {
       await navigator.clipboard.writeText(postUrl);
-      
-      // Flash a temporary "Copied!" notification on that specific post icon for 2 seconds
       setCopiedPostId(post._id);
       setTimeout(() => setCopiedPostId(null), 2000);
+      toast.success("Link copied to clipboard! 🔗");
     } catch (err) {
       console.error("Could not copy text to clipboard: ", err);
-      alert("Failed to copy link.");
+      toast.error("Failed to copy link.");
     }
   };
 
@@ -192,12 +202,10 @@ export default function Feed() {
       });
       
       if (res.ok) {
-        const data = await res.json();
-        // Optional: Ek chota sa visual feedback alert ya toast ke roop mein
-        alert(data.message); 
-      } else {
-        alert("Failed to save post.");
-      }
+        toast.success(data.message); 
+        } else {
+        toast.error("Failed to save post.");
+        }
     } catch (err) {
       console.error("Save Post Error:", err);
     }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
+import toast from 'react-hot-toast';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -26,7 +27,7 @@ export default function Profile() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      let currentUserData = null; // Store it in a standard variable first!
+      let currentUserData = null;
 
       if (resProfile.ok) {
         currentUserData = await resProfile.json();
@@ -55,6 +56,7 @@ export default function Profile() {
       }
     } catch (err) {
       console.error(err);
+      toast.error("Failed to fetch profile data!"); // Better error handling with toast 
     }
   };
 
@@ -99,13 +101,15 @@ useEffect(() => {
         setShowEduModal(false);
         setExpData({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
         setEduData({ school: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
+
+        toast.success("Profile updated successfully! ✨");
         
       } else {
         const errorText = await res.text();
-        alert(`⚠️ Backend Error (${res.status}): ${errorText}`);
+        toast.error(`Backend Error: ${errorText}`);
       }
     } catch (err) {
-       alert(`⚠️ Network Error: ${err.message}`);
+       toast.error(`Network Error: ${err.message}`);
     }
   };
 
@@ -120,6 +124,7 @@ useEffect(() => {
     }
   } catch (err) {
     console.error("Failed to fetch saved posts", err);
+    toast.error("Failed to fetch saved posts", err);
   }
 };
 

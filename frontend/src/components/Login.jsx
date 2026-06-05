@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { API_BASE_URL } from '../config';
+import toast from 'react-hot-toast';
 
 export default function Login() {
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -23,12 +24,12 @@ export default function Login() {
         // Save the digital ID badge in the browser's memory
         localStorage.setItem('token', data.token);
         window.location.reload();
-        alert('Login Successful! Badge secured.');
+        toast.success("Welcome back! 👋");
       } else {
-        alert(`Error: ${data.message}`);
+        toast.error(data.message || "Invalid credentials!");
       }
     } catch (error) {
-      alert('Server connection failed!');
+      toast.error("Server connection failed!");
     }
   };
 
