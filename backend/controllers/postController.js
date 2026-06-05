@@ -172,20 +172,29 @@ const toggleSavePost = async (req, res) => {
     const user = await User.findById(req.user._id);
     const postId = req.params.id;
 
-    if (user.savedPosts.includes(postId)) {
-      // Agar pehle se saved hai, toh Unsave (remove) karo
+    // 🛡️ SAFETY CHECK: Agar purana user hai jiska savedPosts array exist nahi karta, toh empty array bana do
+    if (!user.savedPosts) {
+      user.savedPosts = [];
+    }
+
+    // 🛡️ ID COMPARISON FIX: Mongoose ObjectId aur String ko carefully match karo
+    const isSaved = user.savedPosts.some(id => id.toString() === postId.toString());
+
+    if (isSaved) {
+      // Unsave (Remove)
       user.savedPosts.pull(postId);
       await user.save();
-      return res.json({ message: 'Post removed from saved', savedPosts: user.savedPosts });
+      return res.json({ message: 'Notice removed from saved list' });
     } else {
-      // Agar nahi hai, toh Save (add) karo
+      // Save (Add)
       user.savedPosts.push(postId);
       await user.save();
-      return res.json({ message: 'Post saved successfully', savedPosts: user.savedPosts });
+      return res.json({ message: 'Notice saved successfully 🔖' });
     }
   } catch (error) {
     console.error('Save Post Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+    // Frontend par asli error message bhejein taaki debug karna aasan ho
+    res.status(500).json({ message: `Server Error: ${error.message}` }); 
   }
 };
 
