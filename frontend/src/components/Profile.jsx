@@ -14,6 +14,9 @@ export default function Profile() {
   const [formData, setFormData] = useState({});
   const [expData, setExpData] = useState({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
   const [eduData, setEduData] = useState({ school: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
+
+  const [savedPosts, setSavedPosts] = useState([]);
+  const [activeTab, setActiveTab] = useState('my_posts'); // Default tab
   
   const token = localStorage.getItem('token');
 
@@ -55,8 +58,11 @@ export default function Profile() {
     }
   };
 
-  useEffect(() => { fetchProfileData(); }, [user?._id]);
-
+useEffect(() => { 
+    fetchProfileData(); 
+    fetchSavedPosts(); // ✨ Isko add karna zaroori hai!
+  }, [user?._id]);
+  
   // Handlers for typing in forms
   const handleMainChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleEduChange = (e) => setEduData({ ...eduData, [e.target.name]: e.target.value });
@@ -102,6 +108,20 @@ export default function Profile() {
        alert(`⚠️ Network Error: ${err.message}`);
     }
   };
+
+  const fetchSavedPosts = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts/saved`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setSavedPosts(data);
+    }
+  } catch (err) {
+    console.error("Failed to fetch saved posts", err);
+  }
+};
 
   if (!user) return <div className="p-10 text-center text-gray-500">Loading profile...</div>;
 
@@ -222,53 +242,127 @@ export default function Profile() {
         )}
       </div>
 
-     {/* Activity Section */}
+    {/* Activity Section with Tabs */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-xl font-bold text-gray-900 mb-4">Activity</h2>
         
-        {userPosts.length > 0 ? (
-          <div className="space-y-4">
-            {userPosts.map(post => (
-              <div key={post._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 bg-gray-50">
-                
-                {/* Post Header: Avatar, Name, Title, Time */}
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
-                  <div>
-                    <h3 className="font-bold text-gray-900 text-sm leading-tight hover:text-blue-600 cursor-pointer">
-                      {user.name}
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-0.5">{user.tagline || 'GovNetwork Member'}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      {post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}
+        {/* 🔖 TABS NAVIGATION */}
+        <div className="flex border-b mb-6">
+          <button
+            onClick={() => setActiveTab('my_posts')}
+            className={`pb-3 px-4 font-semibold transition duration-200 text-sm ${
+              activeTab === 'my_posts' 
+                ? 'text-blue-600 border-b-2 border-blue-600' 
+                : 'text-gray-500 hover:text-blue-500'
+            }`}
+          >
+            📝 My Activity
+          </button>
+          <button
+            onClick={() => setActiveTab('saved_posts')}
+            className={`pb-3 px-4 font-semibold transition duration-200 text-sm ${
+              activeTab === 'saved_posts' 
+                ? 'text-blue-600 border-b-2 border-blue-600' 
+                : 'text-gray-500 hover:text-blue-500'
+            }`}
+          >
+            🔖 Saved Notices
+          </button>
+        </div>
+        
+        {/* 📋 POSTS LIST */}
+        <div className="space-y-4">
+          {activeTab === 'my_posts' ? (
+            
+            /* --- MY POSTS TAB --- */
+            userPosts.length > 0 ? (
+              <div className="space-y-4">
+                {userPosts.map(post => (
+                  <div key={post._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 bg-gray-50">
+                    
+                    {/* Post Header: Avatar, Name, Title, Time */}
+                    <div className="flex items-start gap-3 mb-3">
+                      <div className="w-12 h-12 bg-gray-300 rounded-full flex-shrink-0"></div>
+                      <div>
+                        <h3 className="font-bold text-gray-900 text-sm leading-tight hover:text-blue-600 cursor-pointer">
+                          {user.name}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-0.5">{user.tagline || 'GovNetwork Member'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Post Content */}
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                      {post.content || post.title}
                     </p>
+
+                    {/* Post Actions (Visual Only for now) */}
+                    <div className="border-t border-gray-200 mt-4 pt-3 flex gap-6 text-gray-500 text-sm font-medium">
+                      <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
+                        <span className="text-lg">👍</span> Like
+                      </button>
+                      <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
+                        <span className="text-lg">💬</span> Comment
+                      </button>
+                      <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
+                        <span className="text-lg">🔁</span> Repost
+                      </button>
+                    </div>
+
                   </div>
-                </div>
-
-                {/* Post Content */}
-                <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
-                  {post.content || post.title}
-                </p>
-
-                {/* Post Actions (Visual Only for now) */}
-                <div className="border-t border-gray-200 mt-4 pt-3 flex gap-6 text-gray-500 text-sm font-medium">
-                  <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
-                    <span className="text-lg">👍</span> Like
-                  </button>
-                  <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
-                    <span className="text-lg">💬</span> Comment
-                  </button>
-                  <button className="flex items-center gap-1.5 hover:bg-gray-200 px-2 py-1 rounded transition">
-                    <span className="text-lg">🔁</span> Repost
-                  </button>
-                </div>
-
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-sm text-gray-500 italic">You haven't posted anything yet.</p>
-        )}
+            ) : (
+              <p className="text-sm text-gray-500 italic text-center py-6">You haven't posted anything yet.</p>
+            )
+          ) : (
+            
+            /* --- SAVED POSTS TAB --- */
+            savedPosts.length > 0 ? (
+              <div className="space-y-4">
+                {savedPosts.map(post => (
+                  <div key={post._id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition duration-200 bg-white">
+                    
+                    {/* Saved Post Header */}
+                    <div className="flex items-start gap-3 mb-3">
+                      {/* Dynamic Avatar Initials */}
+                      <div className="w-12 h-12 bg-blue-100 text-blue-700 flex items-center justify-center rounded-full font-bold text-lg flex-shrink-0">
+                        {post.user?.name?.charAt(0) || 'U'}
+                      </div>
+                      <div>
+                        {/* Dynamic Author Name */}
+                        <h3 className="font-bold text-gray-900 text-sm leading-tight hover:text-blue-600 cursor-pointer">
+                          {post.user?.name || "Unknown User"}
+                        </h3>
+                        {/* Show Page name if it's an official circular, else user's tagline */}
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {post.page ? `🏢 ${post.page.name}` : (post.user?.tagline || 'GovNetwork Member')}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {post.createdAt ? new Date(post.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Saved Recently'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Saved Post Content */}
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                      {post.content || post.title}
+                    </p>
+
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                <span className="text-3xl block mb-2">🔖</span>
+                <h3 className="text-sm font-medium text-gray-700">No Saved Notices</h3>
+                <p className="text-xs text-gray-500 mt-1">Important updates you save will appear here.</p>
+              </div>
+            )
+          )}
+        </div>
       </div>
 
       {/* Experience Section */}
