@@ -37,6 +37,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/posts', require('./routes/posts'));
 app.use('/api/network', require('./routes/network'));
 app.use('/api/pages', require('./routes/pageRoutes'));
+app.use('/api/search', require('./routes/search'));
 
 app.get('/', (req, res) => {
   res.send('GovNetwork Backend is running!');
