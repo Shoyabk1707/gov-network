@@ -198,5 +198,33 @@ const toggleSavePost = async (req, res) => {
   }
 };
 
+// 📌 Get User's Saved Posts
+const getSavedPosts = async (req, res) => {
+  try {
+    const userId = req.user; 
+    
+    // User ko find karo aur uske 'savedPosts' array ko poori details ke sath populate karo
+    const user = await User.findById(userId).populate({
+      path: 'savedPosts',
+      populate: [
+        { path: 'user', select: 'name role jobTitle department' },
+        { path: 'page', select: 'name category' }
+      ]
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Naye se purane ke order mein sort karne ke liye reverse kar dete hain
+    const savedPosts = user.savedPosts.reverse();
+    
+    res.json(savedPosts);
+  } catch (error) {
+    console.error('Get Saved Posts Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 // ✨ FIXED: Added deletePost in exports array here!
-module.exports = { createPost, getPosts, likePost, deletePost, addComment, getPostById, toggleSavePost };
+module.exports = { createPost, getPosts, likePost, deletePost, addComment, getPostById, toggleSavePost, getSavedPosts };
