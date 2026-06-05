@@ -166,14 +166,14 @@ const getPostById = async (req, res) => {
   }
 };
 
-// 📌 Toggle Save/Unsave Post 
+// 📌 Toggle Save/Unsave Post
 const toggleSavePost = async (req, res) => {
   try {
     const postId = req.params.id;
-    // Note: Aapke auth middleware ke hisaab se id ya _id ho sakta hai, standard req.user._id hota hai
-    const userId = req.user._id || req.user.id; 
+    
+    // 🚀 THE FIX: Aapke middleware ke mutabik req.user seedha ID string hai
+    const userId = req.user; 
 
-    // Pehle sirf read karte hain
     const user = await User.findById(userId);
     
     if (!user) {
