@@ -2,15 +2,24 @@ import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import SkeletonNetworkCard from './SkeletonNetworkCard';
 
-export default function Network({ onViewProfile }) { // <-- Add the prop here
+export default function Network({ onViewProfile }) { 
   const [users, setUsers] = useState([]);
   
-  // NEW: State to track which buttons we've clicked during this session
+  // State to track which buttons we've clicked during this session
   const [followedUsers, setFollowedUsers] = useState([]);
   const [requestedUsers, setRequestedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   
   const token = localStorage.getItem('token');
+
+  // --- 🌟 HELPER: GET INITIALS FOR AVATAR ---
+  const getInitials = (name) => {
+    if (!name) return "U";
+    const parts = name.trim().split(' ');
+    return parts.length >= 2 
+      ? (parts[0][0] + parts[1][0]).toUpperCase() 
+      : parts[0][0].toUpperCase();
+  };
 
   useEffect(() => {
     fetchDiscoverUsers();
@@ -50,8 +59,8 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
       }
     } catch (err) {
       console.error(err);
-    }finally {
-      // 🚀 YEH LINE ADD KARNI HAI: API call pass ho ya fail, loading band kar do
+    } finally {
+      // API call pass ho ya fail, loading band kar do
       setLoading(false);
     }
   };
@@ -64,7 +73,7 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
       });
       const data = await res.json();
       if (res.ok) {
-        // NEW: Instantly update the UI without reloading
+        // Instantly update the UI without reloading
         setFollowedUsers(prev => [...prev, id]); 
       } else {
         alert(`⚠️ ${data.msg}`);
@@ -86,7 +95,7 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
       });
       const data = await res.json();
       if (res.ok) {
-        // NEW: Instantly update the UI without reloading
+        // Instantly update the UI without reloading
         setRequestedUsers(prev => [...prev, id]);
       } else {
         alert(`⚠️ ${data.msg}`);
@@ -123,7 +132,10 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
           {users.map(u => (
             <div key={u._id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200 text-center hover:shadow-md transition">
               
-              <div className="w-16 h-16 bg-gray-300 rounded-full mx-auto mb-4"></div>
+              {/* ✨ DYNAMIC AVATAR ✨ */}
+              <div className="w-16 h-16 bg-blue-100 text-blue-700 flex items-center justify-center rounded-full mx-auto mb-4 text-2xl font-bold tracking-wide">
+                {getInitials(u.name)}
+              </div>
               
               <h2 className="font-bold text-lg text-gray-900">{u.name}</h2>
               <p className="text-sm text-gray-500 mb-3">{u.tagline || 'GovNetwork Member'}</p>
@@ -135,7 +147,7 @@ export default function Network({ onViewProfile }) { // <-- Add the prop here
                 {u.role.toUpperCase()}
               </span>
 
-                <div className="mb-4">
+              <div className="mb-4">
                 <button onClick={() => onViewProfile(u._id)} className="text-blue-600 hover:underline text-sm font-medium">
                     View Full Profile
                 </button>
