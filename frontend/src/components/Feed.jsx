@@ -184,6 +184,25 @@ export default function Feed() {
     }
   };
 
+  const handleSave = async (postId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/save`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        // Optional: Ek chota sa visual feedback alert ya toast ke roop mein
+        alert(data.message); 
+      } else {
+        alert("Failed to save post.");
+      }
+    } catch (err) {
+      console.error("Save Post Error:", err);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto mt-8 px-4">
       {/* Create Post Form */}
@@ -261,36 +280,31 @@ export default function Feed() {
   </div>
   
   <p className="text-gray-700 text-sm whitespace-pre-line">{post.content}</p>
-            {/* --- ACTION BUTTONS (LIKE & COMMENT TOGGLE) --- */}
-            {/* --- ACTION BUTTONS (LIKE, COMMENT & SHARE) --- */}
-            <div className="mt-4 pt-3 border-t flex items-center space-x-6">
-              {/* Like Button */}
-              <button 
-                onClick={() => handleLike(post._id)}
-                className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1"
-              >
-                <span>👍</span>
-                <span>{post.likes?.length || 0} Likes</span>
-              </button>
+            {/* --- ACTION BUTTONS (LIKE, COMMENT, SHARE & SAVE) --- */}
+            <div className="mt-4 pt-3 border-t flex items-center justify-between">
+                
+                <div className="flex items-center space-x-6">
+                {/* Existing Like Button */}
+                <button onClick={() => handleLike(post._id)} className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1">
+                    <span>👍</span><span>{post.likes?.length || 0} Likes</span>
+                </button>
 
-              {/* Comment Toggle Button */}
-              <button 
-                onClick={() => setActiveCommentPost(activeCommentPost === post._id ? null : post._id)}
-                className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1"
-              >
-                <span>💬</span>
-                <span>{post.comments?.length || 0} Comments</span>
-              </button>
+                {/* Existing Comment Button */}
+                <button onClick={() => setActiveCommentPost(activeCommentPost === post._id ? null : post._id)} className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1">
+                    <span>💬</span><span>{post.comments?.length || 0} Comments</span>
+                </button>
 
-              {/* 🔗 Share Button */}
-              <button 
-                onClick={() => handleShare(post)}
-                className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1 relative"
-                title="Share Notice"
-              >
-                <span>🔗</span>
-                <span>{copiedPostId === post._id ? "Copied! ✅" : "Share"}</span>
-              </button>
+                {/* Existing Share Button */}
+                <button onClick={() => handleShare(post)} className="flex items-center text-sm font-semibold text-gray-500 hover:text-blue-600 transition space-x-1" title="Share Notice">
+                    <span>🔗</span><span>{copiedPostId === post._id ? "Copied!" : "Share"}</span>
+                </button>
+                </div>
+
+                {/* ✨ NEW: Save Button (Right aligned) */}
+                <button onClick={() => handleSave(post._id)} className="flex items-center text-sm font-semibold text-gray-500 hover:text-yellow-600 transition space-x-1" title="Save for later">
+                <span>🔖</span><span>Save</span>
+                </button>
+                
             </div>
 
             {/* --- COLLAPSIBLE ACCORDION COMMENT SECTION --- */}

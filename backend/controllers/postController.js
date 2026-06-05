@@ -166,5 +166,28 @@ const getPostById = async (req, res) => {
   }
 };
 
+// 📌 Toggle Save/Unsave Post
+const toggleSavePost = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    const postId = req.params.id;
+
+    if (user.savedPosts.includes(postId)) {
+      // Agar pehle se saved hai, toh Unsave (remove) karo
+      user.savedPosts.pull(postId);
+      await user.save();
+      return res.json({ message: 'Post removed from saved', savedPosts: user.savedPosts });
+    } else {
+      // Agar nahi hai, toh Save (add) karo
+      user.savedPosts.push(postId);
+      await user.save();
+      return res.json({ message: 'Post saved successfully', savedPosts: user.savedPosts });
+    }
+  } catch (error) {
+    console.error('Save Post Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
 // ✨ FIXED: Added deletePost in exports array here!
-module.exports = { createPost, getPosts, likePost, deletePost, addComment, getPostById };
+module.exports = { createPost, getPosts, likePost, deletePost, addComment, getPostById, toggleSavePost };
