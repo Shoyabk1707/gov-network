@@ -12,7 +12,6 @@ function SinglePostView() {
   const [commentText, setCommentText] = useState('');
   
   const token = localStorage.getItem('token');
-  const API_BASE_URL = "https://gov-network-backend.vercel.app"; // Apne exact backend domain se match kar lena bhai
 
   // 📡 FETCH THE SINGLE TARGETED POST
 // 📡 FETCH THE SINGLE TARGETED POST
