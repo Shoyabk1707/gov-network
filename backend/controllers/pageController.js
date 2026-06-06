@@ -1,34 +1,40 @@
 const Page = require('../models/Page');
 
-// 1. Create a new Institute/Brand Page
+// 1. CREATE PAGE FUNCTION
 const createPage = async (req, res) => {
   try {
     const { name, category, bio } = req.body;
-    const currentUserId = req.user.id ? req.user.id : req.user;
+    
+    // Safely get user ID
+    const userId = req.user._id || req.user.id;
 
-    const newPage = await Page.create({
+    const newPage = new Page({
       name,
       category,
       bio,
-      admin: currentUserId // Logged-in user is the owner/admin
+      admin: userId // ✨ FIX: 'user' ki jagah 'admin' save kar rahe hain
     });
 
-    res.status(201).json(newPage);
-  } catch (error) {
-    console.error('Create Page Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+    const page = await newPage.save();
+    res.json(page);
+  } catch (err) {
+    console.error("Error creating page:", err.message);
+    res.status(500).send('Server Error');
   }
 };
 
-// 2. Get all pages managed by the logged-in user
+// 2. GET USER'S PAGES FUNCTION
 const getUserPages = async (req, res) => {
   try {
-    const currentUserId = req.user.id ? req.user.id : req.user;
-    const pages = await Page.find({ admin: currentUserId });
+    const userId = req.user._id || req.user.id;
+    
+    // ✨ FIX: Database mein 'admin' field se dhoondh rahe hain
+    const pages = await Page.find({ admin: userId }).sort({ createdAt: -1 });
+    
     res.json(pages);
-  } catch (error) {
-    console.error('Get User Pages Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+  } catch (err) {
+    console.error("Error fetching user pages:", err.message);
+    res.status(500).send('Server Error');
   }
 };
 
@@ -88,4 +94,15 @@ const followPage = async (req, res) => {
   }
 };
 
-module.exports = { createPage, getUserPages, getPageById, followPage };
+// Get ALL pages for the "Discover" section
+const getAllPages = async (req, res) => {
+  try {
+    const pages = await Page.find().sort({ createdAt: -1 });
+    res.json(pages);
+  } catch (error) {
+    console.error('Get All Pages Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+module.exports = { createPage, getUserPages, getPageById, followPage, getAllPages };
