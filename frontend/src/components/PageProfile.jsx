@@ -31,7 +31,6 @@ export default function PageProfile() {
   useEffect(() => {
     const fetchPageData = async () => {
       try {
-        // 1. Fetch current logged-in user (Admin check karne ke liye)
         const resMe = await fetch(`${API_BASE_URL}/api/auth/me`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -39,7 +38,6 @@ export default function PageProfile() {
           setCurrentUser(await resMe.json());
         }
 
-        // 2. Fetch Page Details
         const resPage = await fetch(`${API_BASE_URL}/api/pages/${id}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -54,14 +52,12 @@ export default function PageProfile() {
           return;
         }
 
-        // 3. Fetch Posts and filter for this specific page
         const resPosts = await fetch(`${API_BASE_URL}/api/posts`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
         if (resPosts.ok) {
           const allPosts = await resPosts.json();
-          // Filter: Sirf woh posts jinme post.page ID match kare
           setPosts(allPosts.filter(p => p.page && (String(p.page._id || p.page) === String(id))));
         }
       } catch (err) {
@@ -75,7 +71,51 @@ export default function PageProfile() {
     if (id) fetchPageData();
   }, [id, token, navigate]);
 
-  // Handle Edit Page Form Submission
+  // --- 🛡️ CRASH-PROOF CHECK FOR FOLLOWING ---
+  const checkIsFollowing = () => {
+    if (!currentUser || !page || !page.followers) return false;
+    return page.followers.some(f => {
+      if (!f) return false; // Agar data corrupt/null hai toh ignore karo
+      const followerId = f._id || f;
+      return String(followerId) === String(currentUser._id);
+    });
+  };
+
+  // Handle Follow / Unfollow Page
+  const handleFollow = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/pages/${id}/follow`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        setPage(prevPage => {
+          if (!prevPage || !currentUser) return prevPage;
+
+          const isFollowing = checkIsFollowing();
+          
+          const updatedFollowers = isFollowing
+            ? prevPage.followers.filter(f => {
+                if (!f) return false;
+                return String(f._id || f) !== String(currentUser._id);
+              }) 
+            : [...prevPage.followers, currentUser._id];                 
+          
+          return { ...prevPage, followers: updatedFollowers };
+        });
+        
+        toast.success(data.msg);
+      } else {
+        toast.error("Action failed.");
+      }
+    } catch (err) {
+      toast.error("Network error.");
+    }
+  };
+
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     try {
@@ -101,37 +141,6 @@ export default function PageProfile() {
     }
   };
 
- // Handle Follow / Unfollow Page
-  const handleFollow = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/pages/${id}/follow`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        
-        setPage(prevPage => {
-          // ✨ FIX: Safe check for both populated and unpopulated IDs
-          const isFollowing = prevPage.followers.some(f => String(f._id || f) === String(currentUser._id));
-          
-          const updatedFollowers = isFollowing
-            ? prevPage.followers.filter(f => String(f._id || f) !== String(currentUser._id)) 
-            : [...prevPage.followers, currentUser._id];                 
-          
-          return { ...prevPage, followers: updatedFollowers };
-        });
-        
-        toast.success(data.msg);
-      } else {
-        toast.error("Action failed.");
-      }
-    } catch (err) {
-      toast.error("Network error.");
-    }
-  };
-
   // --- LOADING SKELETON ---
   if (loading || !page) {
     return (
@@ -151,14 +160,11 @@ export default function PageProfile() {
     );
   }
 
-  // ✨ CHECK IF LOGGED IN USER IS THE OWNER OF THIS PAGE ✨
-  // Schema ke hisaab se page.user me owner ki ID hoti hai
   const isAdmin = currentUser && page && (String(page.user?._id || page.user) === String(currentUser._id));
 
   return (
     <div className="max-w-4xl mx-auto mt-8 space-y-4 pb-12 relative px-4 md:px-0">
       
-      {/* Back Button */}
       <button 
         onClick={() => navigate('/pages')} 
         className="mb-4 text-sm font-semibold text-blue-600 hover:text-blue-800 transition flex items-center gap-1"
@@ -166,7 +172,6 @@ export default function PageProfile() {
         ← Back to Pages
       </button>
 
-      {/* --- EDIT MODAL (ONLY FOR ADMIN) --- */}
       {isAdmin && showEditModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
@@ -198,11 +203,8 @@ export default function PageProfile() {
         </div>
       )}
 
-      {/* --- PAGE HEADER --- */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
-        {/* Cover Photo */}
         <div className="h-32 bg-slate-800 relative">
-          {/* Admin Edit Cover Button (Visual only for now) */}
           {isAdmin && (
             <button onClick={() => setShowEditModal(true)} className="absolute top-4 right-4 bg-white p-2 rounded-full text-blue-600 shadow hover:bg-gray-100 transition" title="Edit Page Details">
               ✏️
@@ -216,7 +218,6 @@ export default function PageProfile() {
               {getInitials(page.name)}
             </div> 
             
-            {/* Follow/Admin Action Button */}
             <div className="pt-4 ml-auto">
               {isAdmin ? (
                 <button onClick={() => setShowEditModal(true)} className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md text-sm font-bold hover:bg-blue-50 transition">
@@ -226,12 +227,12 @@ export default function PageProfile() {
                 <button 
                   onClick={handleFollow}
                   className={`px-5 py-1.5 rounded-md text-sm font-bold transition ${
-                    page.followers?.some(f => String(f._id || f) === String(currentUser?._id))
+                    checkIsFollowing()
                       ? 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  {page.followers?.some(f => String(f._id || f) === String(currentUser?._id)) ? 'Following' : 'Follow'}
+                  {checkIsFollowing() ? 'Following' : 'Follow'}
                 </button>
               )}
             </div>
@@ -247,13 +248,11 @@ export default function PageProfile() {
         </div>
       </div>
 
-      {/* About Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 relative">
         <h2 className="text-xl font-bold text-gray-900 mb-4">About</h2>
         <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{page.bio || 'No description provided.'}</p>
       </div>
 
-      {/* Page Posts Section */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex border-b mb-6">
           <button className="pb-3 px-4 font-semibold transition text-sm text-blue-600 border-b-2 border-blue-600">
