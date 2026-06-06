@@ -1,4 +1,5 @@
 const Page = require('../models/Page');
+const mongoose = require('mongoose');
 
 // 1. Create a new Institute/Brand Page
 const createPage = async (req, res) => {
@@ -73,31 +74,41 @@ const followPage = async (req, res) => {
       return res.status(404).json({ msg: 'Page not found' });
     }
 
-    // Middleware se user id nikalna (kabhi _id hota hai, kabhi id)
-    const userId = req.user._id || req.user.id;
+    // 1. Get exact User ID
+    let userId = req.user._id || req.user.id || req.user;
+    
+    // 2. Convert string to pure MongoDB ObjectId (Yeh sabse zaroori tha!)
+    const userObjectId = new mongoose.Types.ObjectId(userId);
 
-    // Safely check if user exists in followers array
+    // 3. Check if following
     const isFollowing = page.followers.some(
       (follower) => follower.toString() === userId.toString()
     );
 
-    if (isFollowing) {
-      // 🚀 MONGOOSE MAGIC: $pull safely removes the ID
-      await Page.findByIdAndUpdate(page._id, { $pull: { followers: userId } });
-    } else {
-      // 🚀 MONGOOSE MAGIC: $addToSet safely adds without duplicates
-      await Page.findByIdAndUpdate(page._id, { $addToSet: { followers: userId } });
-    }
+    let updatedPage;
 
-    // Naya updated page fetch karke return karna
-    const updatedPage = await Page.findById(page._id);
+    if (isFollowing) {
+      // 🚨 DIRECT DB WRITE: Remove user
+      updatedPage = await Page.findByIdAndUpdate(
+        page._id, 
+        { $pull: { followers: userObjectId } },
+        { new: true } // Returns the updated document
+      );
+    } else {
+      // 🚨 DIRECT DB WRITE: Add user
+      updatedPage = await Page.findByIdAndUpdate(
+        page._id, 
+        { $addToSet: { followers: userObjectId } },
+        { new: true }
+      );
+    }
 
     res.json({ 
       msg: isFollowing ? 'Unfollowed successfully' : 'Followed successfully', 
       followers: updatedPage.followers 
     });
   } catch (err) {
-    console.error("Error in followPage:", err);
+    console.error("🔥 Error in followPage:", err);
     res.status(500).send('Server Error');
   }
 };
