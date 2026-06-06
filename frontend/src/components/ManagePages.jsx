@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import SkeletonPageCard from './SkeletonPageCard';
+import toast from 'react-hot-toast';
 
 export default function ManagePages({ onBack }) {
   const [pages, setPages] = useState([]);
@@ -10,6 +12,16 @@ export default function ManagePages({ onBack }) {
   const [bio, setBio] = useState('');
   const [showForm, setShowForm] = useState(false);
   
+  const navigate = useNavigate();
+
+  // --- 🌟 HELPER: GET INITIALS FOR PAGE LOGO ---
+  const getInitials = (pageName) => {
+    if (!pageName) return "P";
+    const parts = pageName.trim().split(' ');
+    return parts.length >= 2 
+      ? (parts[0][0] + parts[1][0]).toUpperCase() 
+      : parts[0][0].toUpperCase();
+  };
 
   // 1. Fetch user's managed pages
   useEffect(() => {
@@ -35,8 +47,6 @@ export default function ManagePages({ onBack }) {
   // 2. Handle creating a new page
   const handleCreatePage = async (e) => {
     e.preventDefault();
-    console.log("🚀 1. Sending Page Data to Backend:", { name, category, bio });
-
     try {
       const token = localStorage.getItem('token');
       const res = await fetch(`${API_BASE_URL}/api/pages`, {
@@ -48,22 +58,18 @@ export default function ManagePages({ onBack }) {
         body: JSON.stringify({ name, category, bio })
       });
 
-      console.log("📡 2. Response Status Received:", res.status);
-
       if (res.ok) {
         const newPage = await res.json();
-        console.log("✅ 3. Success! New Page Created:", newPage);
         setPages([...pages, newPage]); 
         setName('');
         setBio('');
-        setShowForm(false); 
+        setShowForm(false);
+        toast.success("Page created successfully!");
       } else {
         const errorText = await res.text();
-        console.error("❌ 3. Backend Rejected Request:", errorText);
-        toast.error(`Backend Error! Status Code: ${res.status}\nMessage: ${errorText || 'Check server logs'}`);
+        toast.error(`Backend Error: ${errorText}`);
       }
     } catch (err) {
-      console.error("💥 3. Network Connection Failed:", err);
       alert("Network error: Could not reach the backend server.");
     }
   };
@@ -122,17 +128,31 @@ export default function ManagePages({ onBack }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {pages.map(page => (
-            <div key={page._id} className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between">
+            <div 
+              key={page._id} 
+              className="bg-white p-5 rounded-lg shadow-sm border border-gray-200 flex flex-col justify-between hover:shadow-md transition cursor-pointer"
+              onClick={() => navigate(`/page/${page._id}`)}
+              title="Click to view Page Profile"
+            >
               <div>
-                <h3 className="text-xl font-bold text-gray-900">{page.name}</h3>
-                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                  {page.category}
-                </span>
-                <p className="text-gray-600 text-sm mt-3 line-clamp-2">{page.bio || 'No description provided.'}</p>
+                <div className="flex gap-3 items-start mb-3">
+                  {/* ✨ DYNAMIC PAGE LOGO (Initials) ✨ */}
+                  <div className="w-12 h-12 bg-purple-100 text-purple-700 rounded flex items-center justify-center font-bold text-lg flex-shrink-0">
+                    {getInitials(page.name)}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900 leading-tight">{page.name}</h3>
+                    <span className="text-[10px] bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold mt-1 inline-block uppercase tracking-wide">
+                      {page.category}
+                    </span>
+                  </div>
+                </div>
+                <p className="text-gray-600 text-sm mt-2 line-clamp-2">{page.bio || 'No description provided.'}</p>
               </div>
+              
               <div className="mt-4 pt-3 border-t flex justify-between items-center text-xs text-gray-500">
-                <span>{page.followers?.length || 0} Followers</span>
-                <button className="text-blue-600 hover:underline font-medium">Open Admin View →</button>
+                <span className="font-medium">{page.followers?.length || 0} Followers</span>
+                <span className="text-blue-600 hover:underline font-semibold">View Page →</span>
               </div>
             </div>
           ))}

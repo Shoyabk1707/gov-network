@@ -32,4 +32,23 @@ const getUserPages = async (req, res) => {
   }
 };
 
-module.exports = { createPage, getUserPages };
+const getPageById = async (req, res) => {
+  try {
+    // Model ka naam check kar lena, agar Page hai toh theek hai
+    const page = await Page.findById(req.params.id);
+    
+    if (!page) {
+      return res.status(404).json({ msg: 'Page not found' });
+    }
+    
+    res.json(page);
+  } catch (err) {
+    console.error("Error fetching single page:", err.message);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: 'Page not found' });
+    }
+    res.status(500).send('Server Error');
+  }
+};
+
+module.exports = { createPage, getUserPages, getPageById };

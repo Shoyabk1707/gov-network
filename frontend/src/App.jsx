@@ -13,6 +13,7 @@ import CreatorProfile from './components/CreatorProfile';
 import ManagePages from './components/ManagePages';
 import SinglePostView from './components/SinglePostView';
 import SearchResults from './components/SearchResults';
+import PageProfile from './components/PageProfile';
 
 // 🚀 CLEAN AuthenticatedLayout
 const AuthenticatedLayout = ({ children, handleLogout }) => {
@@ -60,9 +61,11 @@ function App() {
         <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
         
         {/* 🔍 SEARCH ROUTE */}
         <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
+        
 
         {/* --- UNAUTHENTICATED ROUTES (Login/Register) --- */}
         <Route path="/login" element={
