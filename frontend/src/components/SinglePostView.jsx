@@ -93,12 +93,8 @@ function SinglePostView() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6">
-      <Helmet>
-          {/* Normal Browser Title */}
-          <title>{post.title} | GovNetwork</title>
-          
+      <Helmet>          
           {/* Open Graph Tags for LinkedIn, WhatsApp, Facebook */}
-          <meta property="og:title" content={post.title} />
           <meta property="og:description" content={post.content ? post.content.substring(0, 120) + '...' : 'Check out this notice on GovNetwork'} />
           <meta property="og:type" content="article" />
           <meta property="og:url" content={window.location.href} />
@@ -108,7 +104,6 @@ function SinglePostView() {
 
           {/* Twitter Card Tags */}
           <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content={post.title} />
           <meta name="twitter:description" content={post.content ? post.content.substring(0, 120) + '...' : ''} />
         </Helmet>
       {/* Back to Home Navigator */}
@@ -123,7 +118,6 @@ function SinglePostView() {
       <div className="bg-white p-6 rounded-xl shadow-md border-t-4 border-blue-600 space-y-4">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{post.title}</h2>
             {post.page ? (
               <p className="text-xs font-bold text-purple-700 mt-1">
                 🏢 {post.page.name} <span className="text-gray-400 font-normal">({post.page.category})</span>

@@ -11,10 +11,6 @@ const postSchema = new mongoose.Schema({
     ref: "Page", 
     default: null, 
   },
-  title: {
-    type: String,
-    required: true,
-  },
   content: {
     type: String,
     required: true,

@@ -12,21 +12,50 @@ import ManagePages from './components/ManagePages';
 import SinglePostView from './components/SinglePostView';
 import SearchResults from './components/SearchResults';
 import PageProfile from './components/PageProfile';
-import Auth from './components/Auth'; // 🚀 NAYA AUTH COMPONENT (Jo Login/Register dono handle karega)
+import Auth from './components/Auth';
 
-// 🚀 CLEAN AuthenticatedLayout
+// 🚀 NEW APP SHELL COMPONENTS
+import LeftSidebar from './components/LeftSidebar';
+import RightSidebar from './components/RightSidebar';
+import BottomNav from './components/BottomNav';
+
+// 🚀 UPDATED MODULAR AuthenticatedLayout (Mobile Responsive App Shell)
 const AuthenticatedLayout = ({ children, handleLogout }) => {
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-[#F4F6F8]">
       <Navbar handleLogout={handleLogout} />
-      {children}
+      
+      {/* Main Grid Setup: 
+        - pb-24: Mobile mein bottom nav ke neeche content chhupne se bachane ke liye.
+        - grid-cols-1 md:grid-cols-12: Mobile pe 1 column, Desktop pe 12 column.
+      */}
+      <main className="max-w-7xl mx-auto px-4 pt-6 pb-24 md:pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+        
+        {/* LEFT SIDEBAR (Hidden on mobile, 3 columns on desktop) */}
+        <div className="hidden md:block md:col-span-3">
+          <LeftSidebar />
+        </div>
+
+        {/* DYNAMIC CENTER CONTENT (Full width on mobile, 6 columns on desktop) */}
+        <div className="col-span-1 md:col-span-6">
+          {children}
+        </div>
+
+        {/* RIGHT SIDEBAR (Hidden on mobile/tablet, 3 columns on large desktop) */}
+        <div className="hidden lg:block lg:col-span-3">
+          <RightSidebar />
+        </div>
+        
+      </main>
+
+      {/* BOTTOM NAVIGATION (Only visible on mobile) */}
+      <BottomNav />
     </div>
   );
 };
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -44,46 +73,32 @@ function App() {
       <Toaster position="bottom-center" toastOptions={{ duration: 3000 }} />
 
       <Routes>
-        {/* 🚀 PUBLIC ROUTE */}
         <Route path="/post/:id" element={
           isAuthenticated ? (
             <AuthenticatedLayout handleLogout={handleLogout}><SinglePostView /></AuthenticatedLayout>
           ) : (
-            <div className="min-h-screen bg-gray-100 py-10"><SinglePostView /></div>
+            <div className="min-h-screen bg-[#F4F6F8] py-10"><SinglePostView /></div>
           )
         } />
 
         {/* --- AUTHENTICATED ROUTES --- */}
-        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed onLogout={handleLogout} /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
-        
-        {/* 🔍 SEARCH ROUTE */}
         <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
         
-        {/* --- UNAUTHENTICATED ROUTES (New Single Auth Component) --- */}
-        <Route path="/login" element={
-          !isAuthenticated ? (
-            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-              <Auth />
-            </div>
-          ) : <Navigate to="/" replace />
-        } />
-        
-        {/* Redirect /register to /login just in case someone types it in URL */}
+        {/* --- AUTH ROUTE --- */}
+        <Route path="/login" element={!isAuthenticated ? <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4"><Auth /></div> : <Navigate to="/" replace />} />
         <Route path="/register" element={<Navigate to="/login" replace />} />
-        
-        {/* Fallback Route */}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
       </Routes>
     </>
   );
 }
 
-// Helper wrapper for CreatorProfile
 const CreatorProfileWrapper = () => {
   const { userId } = useParams();
   const navigate = useNavigate();

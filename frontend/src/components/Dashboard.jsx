@@ -51,7 +51,7 @@ if (!user) {
       </div>
     );
   }
-  
+
   return (
     <div className="min-h-screen bg-gray-100 pb-12">
       {/* Profile Card */}

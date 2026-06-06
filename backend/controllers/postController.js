@@ -4,7 +4,7 @@ const User = require('../models/User');
 // Create a new post (Personal OR Page Post)
 const createPost = async (req, res) => {
   try {
-    const { title, content, category, pageId } = req.body;
+    const { content, category, pageId } = req.body;
     const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
 
     const postData = {
