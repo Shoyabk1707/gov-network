@@ -3,9 +3,7 @@ import { Routes, Route, useNavigate, Navigate, useParams } from 'react-router-do
 import { Toaster } from 'react-hot-toast';
 
 // Components
-import Navbar from './components/Navbar'; // 🚀 NAYA IMPORT
-import Register from './components/Register';
-import Login from './components/Login';
+import Navbar from './components/Navbar'; 
 import Feed from './components/Feed';
 import Profile from './components/Profile';
 import Network from './components/Network';
@@ -14,6 +12,7 @@ import ManagePages from './components/ManagePages';
 import SinglePostView from './components/SinglePostView';
 import SearchResults from './components/SearchResults';
 import PageProfile from './components/PageProfile';
+import Auth from './components/Auth'; // 🚀 NAYA AUTH COMPONENT (Jo Login/Register dono handle karega)
 
 // 🚀 CLEAN AuthenticatedLayout
 const AuthenticatedLayout = ({ children, handleLogout }) => {
@@ -27,7 +26,6 @@ const AuthenticatedLayout = ({ children, handleLogout }) => {
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [showLogin, setShowLogin] = useState(true);
   
   const navigate = useNavigate();
 
@@ -66,18 +64,17 @@ function App() {
         {/* 🔍 SEARCH ROUTE */}
         <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
         
-
-        {/* --- UNAUTHENTICATED ROUTES (Login/Register) --- */}
+        {/* --- UNAUTHENTICATED ROUTES (New Single Auth Component) --- */}
         <Route path="/login" element={
           !isAuthenticated ? (
-            <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center">
-              {showLogin ? <Login setIsAuthenticated={setIsAuthenticated} /> : <Register />}
-              <button onClick={() => setShowLogin(!showLogin)} className="mt-4 text-blue-600 underline">
-                {showLogin ? "Need an account? Register here." : "Already have an account? Login here."}
-              </button>
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+              <Auth />
             </div>
           ) : <Navigate to="/" replace />
         } />
+        
+        {/* Redirect /register to /login just in case someone types it in URL */}
+        <Route path="/register" element={<Navigate to="/login" replace />} />
         
         {/* Fallback Route */}
         <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />

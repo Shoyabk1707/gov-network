@@ -18,12 +18,11 @@ const registerUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // 4. Create the new user using our User Model blueprint
-    const user = await User.create({
+    const newUser = new User({
       name,
       email,
       password: hashedPassword,
-      department,
-      jobTitle,
+      role
     });
 
     // 5. Send a success message back to the frontend
