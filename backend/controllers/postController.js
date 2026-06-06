@@ -1,27 +1,28 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
 
-// Create a new post (Personal OR Page Post)
 const createPost = async (req, res) => {
   try {
     const { content, category, pageId } = req.body;
-    const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
+    
+    // Auth middleware se aane wali user string ya object ko safely parse karne ke liye
+    const currentUserId = req.user?._id || req.user?.id || req.user;
 
-    const postData = {
-      user: currentUserId, 
-      title,
+    if (!content?.trim()) {
+      return res.status(400).json({ message: 'Content is required to create a post' });
+    }
+
+    const newPost = await Post.create({
+      user: currentUserId.toString(),
       content,
-      category,
-      page: pageId ? pageId : null 
-    };
-
-    const newPost = await Post.create(postData);
+      category: category || 'Networking',
+      page: pageId || null
+    });
 
     const populatedPost = await Post.findById(newPost._id)
-                                    .populate('user', 'name role jobTitle department')
-                                    .populate('page', 'name category'); 
+      .populate('user', 'name role jobTitle department')
+      .populate('page', 'name category');
 
-    console.log("📡 BACKEND SENDING THIS NEW POST DATA:", populatedPost);
     res.status(201).json(populatedPost);
   } catch (error) {
     console.error('Create Post Error:', error.message);
@@ -29,28 +30,18 @@ const createPost = async (req, res) => {
   }
 };
 
-// 2. Fetch all notices for the timeline (UPDATED FOR PAGES)
 const getPosts = async (req, res) => {
   try {
-    const currentUserId = req.user._id ? req.user._id.toString() : 
-                          req.user.id ? req.user.id.toString() : 
-                          req.user.toString();
-    
-    console.log("---- FEED ALGORITHM RUNNING WITH PAGES ----");
-
     const posts = await Post.find({})
-                            .populate('user', 'name role jobTitle department') 
-                            .populate('page', 'name category')                 
-                            .populate('comments.user', 'name role jobTitle department')
-                            .sort({ createdAt: -1 });
-
-    console.log(`Successfully found ${posts.length} total posts on timeline.`);
-    console.log("--------------------------------");
+      .populate('user', 'name role jobTitle department')
+      .populate('page', 'name category')
+      .populate('comments.user', 'name role jobTitle department')
+      .sort({ createdAt: -1 });
 
     res.json(posts);
   } catch (err) {
     console.error("Feed Error:", err.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
@@ -59,16 +50,15 @@ const likePost = async (req, res) => {
     const post = await Post.findById(req.params.id);
     if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    if (!post.likes) {
-      post.likes = [];
-    }
+    if (!post.likes) post.likes = [];
 
-    const alreadyLiked = post.likes.includes(req.user);
+    const userIdStr = (req.user._id || req.user.id || req.user).toString();
+    const index = post.likes.findIndex(id => id.toString() === userIdStr);
 
-    if (alreadyLiked) {
-      post.likes = post.likes.filter(userId => userId.toString() !== req.user);
+    if (index > -1) {
+      post.likes.splice(index, 1);
     } else {
-      post.likes.push(req.user);
+      post.likes.push(userIdStr);
     }
 
     await post.save();
@@ -79,23 +69,15 @@ const likePost = async (req, res) => {
   }
 };
 
-// 4. Delete a post (NATIVE MONGOOSE EQUALS MATCH)
 const deletePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+    if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const currentUserDoc = req.user._id ? req.user._id : (req.user.id ? req.user.id : req.user);
-    const postAuthorDoc = post.user._id ? post.user._id : post.user;
+    const currentUserDoc = req.user._id || req.user.id || req.user;
+    const postAuthorDoc = post.user?._id || post.user;
 
-    console.log("--- DEBUGGING DELETE MATCH ---");
-    const isAuthorized = postAuthorDoc.toString() === currentUserDoc.toString();
-    console.log("Is Authorized Outcome:", isAuthorized);
-    console.log("------------------------------");
-
-    if (!isAuthorized) {
+    if (postAuthorDoc.toString() !== currentUserDoc.toString()) {
       return res.status(401).json({ message: 'User not authorized to delete this post' });
     }
 
@@ -107,103 +89,77 @@ const deletePost = async (req, res) => {
   }
 };
 
-// 5. Add a comment to a post
 const addComment = async (req, res) => {
   try {
     const { text } = req.body;
-    if (!text) {
-      return res.status(400).json({ message: 'Comment text is required' });
-    }
+    if (!text?.trim()) return res.status(400).json({ message: 'Comment text is required' });
 
     const post = await Post.findById(req.params.id);
-    if (!post) {
-      return res.status(404).json({ message: 'Post not found' });
-    }
+    if (!post) return res.status(404).json({ message: 'Post not found' });
 
-    const currentUserId = req.user._id ? req.user._id.toString() : (req.user.id ? req.user.id.toString() : req.user.toString());
+    const currentUserId = req.user._id || req.user.id || req.user;
 
-    // Naya comment ka object array me push karo
-    const newComment = {
-      user: currentUserId,
+    post.comments.push({
+      user: currentUserId.toString(),
       text: text
-    };
-
-    post.comments.push(newComment);
+    });
+    
     await post.save();
 
-    // Freshly updated post ko poore comment users ke 'name role' ke sath populate karo
     const updatedPost = await Post.findById(req.params.id)
-                                  .populate('user', 'name role jobTitle department')
-                                  .populate('page', 'name category')
-                                  .populate('comments.user', 'name role jobTitle department'); // ✨ Comment karne wale ka data
+      .populate('comments.user', 'name role jobTitle department');
 
-    res.json(updatedPost.comments); // Sirf updated comments ka array return karenge frontend ko
+    res.json(updatedPost.comments);
   } catch (error) {
     console.error('Comment Error:', error.message);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// 6. Get a single post by ID (For shared links & single view)
 const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-                            .populate('user', 'name role jobTitle department')
-                            .populate('page', 'name category')
-                            .populate('comments.user', 'name role jobTitle department');
+      .populate('user', 'name role jobTitle department')
+      .populate('page', 'name category')
+      .populate('comments.user', 'name role jobTitle department');
 
-    if (!post) {
-      return res.status(404).json({ message: 'Notice not found' });
-    }
+    if (!post) return res.status(404).json({ message: 'Notice not found' });
 
     res.json(post);
   } catch (error) {
     console.error('Get Single Post Error:', error.message);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Notice not found' });
-    }
+    if (error.kind === 'ObjectId') return res.status(404).json({ message: 'Notice not found' });
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// 📌 Toggle Save/Unsave Post
 const toggleSavePost = async (req, res) => {
   try {
     const postId = req.params.id;
-    
-    // 🚀 THE FIX: Aapke middleware ke mutabik req.user seedha ID string hai
-    const userId = req.user; 
+    const userId = req.user._id || req.user.id || req.user; 
 
     const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Safely check if already saved
-    const isSaved = user.savedPosts && user.savedPosts.some(id => id.toString() === postId.toString());
+    const isSaved = user.savedPosts?.some(id => id.toString() === postId.toString());
 
     if (isSaved) {
-      // 🚀 Direct DB Update: Unsave (Pull)
-      await User.findByIdAndUpdate(userId, { $pull: { savedPosts: postId } }, { new: true });
+      await User.findByIdAndUpdate(userId, { $pull: { savedPosts: postId } });
       return res.json({ message: 'Notice removed from saved list' });
     } else {
-      // 🚀 Direct DB Update: Save (AddToSet prevents duplicates automatically)
-      await User.findByIdAndUpdate(userId, { $addToSet: { savedPosts: postId } }, { new: true });
+      await User.findByIdAndUpdate(userId, { $addToSet: { savedPosts: postId } });
       return res.json({ message: 'Notice saved successfully 🔖' });
     }
   } catch (error) {
-    console.error('Save Post Error Detailed:', error);
-    res.status(500).json({ message: `Server Error: ${error.message}` });
+    console.error('Save Post Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// 📌 Get User's Saved Posts
 const getSavedPosts = async (req, res) => {
   try {
-    const userId = req.user; 
+    const userId = req.user._id || req.user.id || req.user; 
     
-    // User ko find karo aur uske 'savedPosts' array ko poori details ke sath populate karo
     const user = await User.findById(userId).populate({
       path: 'savedPosts',
       populate: [
@@ -212,19 +168,22 @@ const getSavedPosts = async (req, res) => {
       ]
     });
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-    // Naye se purane ke order mein sort karne ke liye reverse kar dete hain
-    const savedPosts = user.savedPosts.reverse();
-    
-    res.json(savedPosts);
+    res.json(user.savedPosts.reverse());
   } catch (error) {
     console.error('Get Saved Posts Error:', error.message);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// ✨ FIXED: Added deletePost in exports array here!
-module.exports = { createPost, getPosts, likePost, deletePost, addComment, getPostById, toggleSavePost, getSavedPosts };
+module.exports = { 
+  createPost, 
+  getPosts, 
+  likePost, 
+  deletePost, 
+  addComment, 
+  getPostById, 
+  toggleSavePost, 
+  getSavedPosts 
+};

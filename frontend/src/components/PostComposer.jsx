@@ -7,30 +7,31 @@ export default function PostComposer({ onPostSuccess }) {
   const [category, setCategory] = useState('Networking');
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/posts`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify({ title: "Update", content, category, pageId: null }) 
-      });
-      
-      if (res.ok) {
-        const newPostData = await res.json(); 
-        onPostSuccess(newPostData); // Naya post Feed me bhejo
-        setContent('');
-        toast.success("Post published successfully! 🚀");
-      } else {
-        toast.error("Failed to publish post.");
-      }
-    } catch (err) {
-      console.error(err);
-      toast.error("Network error.");
+  e.preventDefault();
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/posts`, {
+      method: 'POST',
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('token')}` 
+      },
+      // 🚀 CLEAN PAYLOAD: Koi dummy title nahi bhejenge ab
+      body: JSON.stringify({ content, category }) 
+    });
+    
+    if (res.ok) {
+      const newPostData = await res.json(); 
+      onPostSuccess(newPostData); 
+      setContent('');
+      toast.success("Post published successfully! 🚀");
+    } else {
+      toast.error("Failed to publish post.");
     }
-  };
+  } catch (err) {
+    console.error(err);
+    toast.error("Network error.");
+  }
+};
 
   return (
     <div className="bg-white p-4 rounded-2xl border border-gray-200 shadow-sm mb-6">

@@ -17,7 +17,7 @@ const globalSearch = async (req, res) => {
     // 🚀 Promise.all lagao taaki teeno queries ek sath run hon
     const [users, posts, pages] = await Promise.all([
       User.find({ name: regex }).select('name role jobTitle department tagline').limit(5),
-      Post.find({ $or: [{ title: regex }, { content: regex }] }).populate('user', 'name').populate('page', 'name').limit(10),
+      Post.find({ $or: [{ content: regex }] }).populate('user', 'name').populate('page', 'name').limit(10),
       Page.find({ $or: [{ name: regex }, { category: regex }] }).limit(5)
     ]);
 
