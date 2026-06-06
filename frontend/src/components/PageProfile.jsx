@@ -113,10 +113,11 @@ export default function PageProfile() {
         const data = await res.json();
         
         setPage(prevPage => {
-          // ✨ FIX: Proper string matching for UI update
-          const isFollowing = prevPage.followers.some(fId => String(fId) === String(currentUser._id));
+          // ✨ FIX: Safe check for both populated and unpopulated IDs
+          const isFollowing = prevPage.followers.some(f => String(f._id || f) === String(currentUser._id));
+          
           const updatedFollowers = isFollowing
-            ? prevPage.followers.filter(fId => String(fId) !== String(currentUser._id)) 
+            ? prevPage.followers.filter(f => String(f._id || f) !== String(currentUser._id)) 
             : [...prevPage.followers, currentUser._id];                 
           
           return { ...prevPage, followers: updatedFollowers };
@@ -216,7 +217,6 @@ export default function PageProfile() {
             </div> 
             
             {/* Follow/Admin Action Button */}
-            {/* Follow/Admin Action Button */}
             <div className="pt-4 ml-auto">
               {isAdmin ? (
                 <button onClick={() => setShowEditModal(true)} className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md text-sm font-bold hover:bg-blue-50 transition">
@@ -226,12 +226,12 @@ export default function PageProfile() {
                 <button 
                   onClick={handleFollow}
                   className={`px-5 py-1.5 rounded-md text-sm font-bold transition ${
-                    page.followers?.some(fId => String(fId) === String(currentUser?._id))
+                    page.followers?.some(f => String(f._id || f) === String(currentUser?._id))
                       ? 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  {page.followers?.some(fId => String(fId) === String(currentUser?._id)) ? 'Following' : 'Follow'}
+                  {page.followers?.some(f => String(f._id || f) === String(currentUser?._id)) ? 'Following' : 'Follow'}
                 </button>
               )}
             </div>

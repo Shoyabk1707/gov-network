@@ -51,40 +51,39 @@ const getPageById = async (req, res) => {
   }
 };
 
-// FUNCTION: Follow / Unfollow a Page
+// Follow / Unfollow a Page 
 const followPage = async (req, res) => {
   try {
     const page = await Page.findById(req.params.id);
-    
     if (!page) {
       return res.status(404).json({ msg: 'Page not found' });
     }
 
-    // ✨ FIX: String mein convert karke check karna 
+    // Middleware se user id nikalna (kabhi _id hota hai, kabhi id)
+    const userId = req.user._id || req.user.id;
+
+    // Safely check if user exists in followers array
     const isFollowing = page.followers.some(
-      (userId) => userId.toString() === req.user.id.toString()
+      (follower) => follower.toString() === userId.toString()
     );
 
     if (isFollowing) {
-      // Unfollow: Filter out the user's ID
-      page.followers = page.followers.filter(
-        (userId) => userId.toString() !== req.user.id.toString()
-      );
+      // 🚀 MONGOOSE MAGIC: $pull safely removes the ID
+      await Page.findByIdAndUpdate(page._id, { $pull: { followers: userId } });
     } else {
-      // Follow: Push the user's ID
-      page.followers.push(req.user.id);
+      // 🚀 MONGOOSE MAGIC: $addToSet safely adds without duplicates
+      await Page.findByIdAndUpdate(page._id, { $addToSet: { followers: userId } });
     }
 
-    await page.save();
+    // Naya updated page fetch karke return karna
+    const updatedPage = await Page.findById(page._id);
+
     res.json({ 
       msg: isFollowing ? 'Unfollowed successfully' : 'Followed successfully', 
-      followers: page.followers 
+      followers: updatedPage.followers 
     });
   } catch (err) {
-    console.error("Error in followPage:", err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'Page not found' });
-    }
+    console.error("Error in followPage:", err);
     res.status(500).send('Server Error');
   }
 };
