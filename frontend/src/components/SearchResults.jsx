@@ -93,6 +93,29 @@ export default function SearchResults() {
         )}
 
         {/* --- PEOPLE TAB --- */}
+        {activeTab === 'people' && (
+          results.users.length > 0 ? (
+            results.users.map(user => (
+              <div key={user._id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center font-bold text-lg">
+                    {user.name?.charAt(0)}
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 cursor-pointer hover:text-blue-600" onClick={() => navigate(`/creator/${user._id}`)}>
+                      {user.name}
+                    </h3>
+                    <p className="text-xs text-gray-500">{user.tagline || user.jobTitle}</p>
+                  </div>
+                </div>
+                <button onClick={() => navigate(`/creator/${user._id}`)} className="text-sm text-blue-600 font-semibold border border-blue-600 px-4 py-1 rounded-full hover:bg-blue-50 transition">
+                  View
+                </button>
+              </div>
+            ))
+          ) : <p className="text-gray-500 text-center py-10">No people found.</p>
+        )}
+
         {/* --- PAGES TAB --- */}
         {activeTab === 'pages' && (
           results.pages.length > 0 ? (
@@ -116,25 +139,6 @@ export default function SearchResults() {
                 <button className="text-sm text-blue-600 font-semibold border border-blue-600 px-4 py-1 rounded-full hover:bg-blue-100 transition">
                   View
                 </button>
-              </div>
-            ))
-          ) : <p className="text-gray-500 text-center py-10">No pages found.</p>
-        )}
-
-        {/* --- PAGES TAB --- */}
-        {activeTab === 'pages' && (
-          results.pages.length > 0 ? (
-            results.pages.map(page => (
-              <div key={page._id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 text-gray-600 rounded-lg flex items-center justify-center font-bold text-xl">
-                    🏢
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">{page.name}</h3>
-                    <p className="text-xs text-gray-500">{page.category}</p>
-                  </div>
-                </div>
               </div>
             ))
           ) : <p className="text-gray-500 text-center py-10">No pages found.</p>
