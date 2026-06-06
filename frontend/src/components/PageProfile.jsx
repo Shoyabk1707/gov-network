@@ -101,6 +101,36 @@ export default function PageProfile() {
     }
   };
 
+  // Handle Follow / Unfollow Page
+  const handleFollow = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/pages/${id}/follow`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        
+        // ✨ INSTANT UI UPDATE WITHOUT REFRESH ✨
+        setPage(prevPage => {
+          const isFollowing = prevPage.followers.includes(currentUser._id);
+          const updatedFollowers = isFollowing
+            ? prevPage.followers.filter(fId => fId !== currentUser._id) // Remove if unfollowing
+            : [...prevPage.followers, currentUser._id];                 // Add if following
+          
+          return { ...prevPage, followers: updatedFollowers };
+        });
+        
+        toast.success(data.msg);
+      } else {
+        toast.error("Action failed.");
+      }
+    } catch (err) {
+      toast.error("Network error.");
+    }
+  };
+
   // --- LOADING SKELETON ---
   if (loading || !page) {
     return (
@@ -181,7 +211,6 @@ export default function PageProfile() {
         
         <div className="px-6 pb-6 relative">
           <div className="flex justify-between items-end">
-            {/* ✨ PAGE LOGO (Rounded-2xl ki jagah thoda square look deta hai page ko) ✨ */}
             <div className="w-32 h-32 bg-purple-100 text-purple-800 rounded-2xl border-4 border-white absolute -top-16 left-6 shadow-sm flex items-center justify-center text-4xl font-extrabold tracking-wide z-10">
               {getInitials(page.name)}
             </div> 
@@ -193,8 +222,15 @@ export default function PageProfile() {
                   Manage Page
                 </button>
               ) : (
-                <button className="bg-blue-600 text-white px-5 py-1.5 rounded-md text-sm font-bold hover:bg-blue-700 transition">
-                  Follow
+                <button 
+                  onClick={handleFollow}
+                  className={`px-5 py-1.5 rounded-md text-sm font-bold transition ${
+                    page.followers?.includes(currentUser?._id)
+                      ? 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  {page.followers?.includes(currentUser?._id) ? 'Following' : 'Follow'}
                 </button>
               )}
             </div>

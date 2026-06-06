@@ -51,4 +51,37 @@ const getPageById = async (req, res) => {
   }
 };
 
-module.exports = { createPage, getUserPages, getPageById };
+// FUNCTION: Follow / Unfollow a Page
+const followPage = async (req, res) => {
+  try {
+    const page = await Page.findById(req.params.id);
+    
+    if (!page) {
+      return res.status(404).json({ msg: 'Page not found' });
+    }
+
+    // Check if user is already in the followers array
+    const isFollowing = page.followers.includes(req.user.id);
+
+    if (isFollowing) {
+      // Unfollow: Remove user ID from array
+      page.followers = page.followers.filter(
+        (userId) => userId.toString() !== req.user.id.toString()
+      );
+    } else {
+      // Follow: Add user ID to array
+      page.followers.push(req.user.id);
+    }
+
+    await page.save();
+    res.json({ msg: isFollowing ? 'Unfollowed successfully' : 'Followed successfully', followers: page.followers });
+  } catch (err) {
+    console.error("Error in followPage:", err.message);
+    if (err.kind === 'ObjectId') {
+      return res.status(404).json({ msg: 'Page not found' });
+    }
+    res.status(500).send('Server Error');
+  }
+};
+
+module.exports = { createPage, getUserPages, getPageById, followPage };
