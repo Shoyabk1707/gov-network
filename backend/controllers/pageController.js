@@ -1,40 +1,48 @@
 const Page = require('../models/Page');
 
-// 1. CREATE PAGE FUNCTION
+// 1. Create a new Institute/Brand Page
 const createPage = async (req, res) => {
   try {
     const { name, category, bio } = req.body;
     
-    // Safely get user ID
-    const userId = req.user._id || req.user.id;
+    let userId;
+    if (typeof req.user === 'string') userId = req.user;
+    else if (req.user && req.user.id) userId = req.user.id;
+    else if (req.user && req.user._id) userId = req.user._id;
 
-    const newPage = new Page({
+    if (!userId) {
+      console.log("Error: User auth object is invalid");
+      return res.status(400).json({ message: 'Authentication error' });
+    }
+
+    const newPage = await Page.create({
       name,
       category,
       bio,
-      admin: userId // ✨ FIX: 'user' ki jagah 'admin' save kar rahe hain
+      admin: userId // Ab yeh pakka save hoga
     });
 
-    const page = await newPage.save();
-    res.json(page);
-  } catch (err) {
-    console.error("Error creating page:", err.message);
-    res.status(500).send('Server Error');
+    res.status(201).json(newPage);
+  } catch (error) {
+    console.error('Create Page Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
-// 2. GET USER'S PAGES FUNCTION
+// 2. Get all pages managed by the logged-in user
 const getUserPages = async (req, res) => {
   try {
-    const userId = req.user._id || req.user.id;
-    
-    // ✨ FIX: Database mein 'admin' field se dhoondh rahe hain
+    // 🚨 BULLETPROOF ID EXTRACTION
+    let userId;
+    if (typeof req.user === 'string') userId = req.user;
+    else if (req.user && req.user.id) userId = req.user.id;
+    else if (req.user && req.user._id) userId = req.user._id;
+
     const pages = await Page.find({ admin: userId }).sort({ createdAt: -1 });
-    
     res.json(pages);
-  } catch (err) {
-    console.error("Error fetching user pages:", err.message);
-    res.status(500).send('Server Error');
+  } catch (error) {
+    console.error('Get User Pages Error:', error.message);
+    res.status(500).json({ message: 'Server Error' });
   }
 };
 
