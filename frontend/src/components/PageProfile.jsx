@@ -101,7 +101,7 @@ export default function PageProfile() {
     }
   };
 
-  // Handle Follow / Unfollow Page
+ // Handle Follow / Unfollow Page
   const handleFollow = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/pages/${id}/follow`, {
@@ -112,12 +112,12 @@ export default function PageProfile() {
       if (res.ok) {
         const data = await res.json();
         
-        // ✨ INSTANT UI UPDATE WITHOUT REFRESH ✨
         setPage(prevPage => {
-          const isFollowing = prevPage.followers.includes(currentUser._id);
+          // ✨ FIX: Proper string matching for UI update
+          const isFollowing = prevPage.followers.some(fId => String(fId) === String(currentUser._id));
           const updatedFollowers = isFollowing
-            ? prevPage.followers.filter(fId => fId !== currentUser._id) // Remove if unfollowing
-            : [...prevPage.followers, currentUser._id];                 // Add if following
+            ? prevPage.followers.filter(fId => String(fId) !== String(currentUser._id)) 
+            : [...prevPage.followers, currentUser._id];                 
           
           return { ...prevPage, followers: updatedFollowers };
         });
@@ -216,6 +216,7 @@ export default function PageProfile() {
             </div> 
             
             {/* Follow/Admin Action Button */}
+            {/* Follow/Admin Action Button */}
             <div className="pt-4 ml-auto">
               {isAdmin ? (
                 <button onClick={() => setShowEditModal(true)} className="border border-blue-600 text-blue-600 px-4 py-1.5 rounded-md text-sm font-bold hover:bg-blue-50 transition">
@@ -225,12 +226,12 @@ export default function PageProfile() {
                 <button 
                   onClick={handleFollow}
                   className={`px-5 py-1.5 rounded-md text-sm font-bold transition ${
-                    page.followers?.includes(currentUser?._id)
+                    page.followers?.some(fId => String(fId) === String(currentUser?._id))
                       ? 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200' 
                       : 'bg-blue-600 text-white hover:bg-blue-700'
                   }`}
                 >
-                  {page.followers?.includes(currentUser?._id) ? 'Following' : 'Follow'}
+                  {page.followers?.some(fId => String(fId) === String(currentUser?._id)) ? 'Following' : 'Follow'}
                 </button>
               )}
             </div>

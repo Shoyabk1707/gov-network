@@ -60,21 +60,26 @@ const followPage = async (req, res) => {
       return res.status(404).json({ msg: 'Page not found' });
     }
 
-    // Check if user is already in the followers array
-    const isFollowing = page.followers.includes(req.user.id);
+    // ✨ FIX: String mein convert karke check karna 
+    const isFollowing = page.followers.some(
+      (userId) => userId.toString() === req.user.id.toString()
+    );
 
     if (isFollowing) {
-      // Unfollow: Remove user ID from array
+      // Unfollow: Filter out the user's ID
       page.followers = page.followers.filter(
         (userId) => userId.toString() !== req.user.id.toString()
       );
     } else {
-      // Follow: Add user ID to array
+      // Follow: Push the user's ID
       page.followers.push(req.user.id);
     }
 
     await page.save();
-    res.json({ msg: isFollowing ? 'Unfollowed successfully' : 'Followed successfully', followers: page.followers });
+    res.json({ 
+      msg: isFollowing ? 'Unfollowed successfully' : 'Followed successfully', 
+      followers: page.followers 
+    });
   } catch (err) {
     console.error("Error in followPage:", err.message);
     if (err.kind === 'ObjectId') {
