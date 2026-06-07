@@ -83,4 +83,36 @@ const getUserProfile = async (req, res) => {
   }
 };
 
-module.exports = { registerUser, loginUser, getUserProfile };
+// PUT /api/auth/profile wala function jahan bhi ho:
+const updateProfile = async (req, res) => {
+  try {
+    // 1. req.body se targetExams ko bhi nikal lo
+    const { name, tagline, city, state, bio, skills, experience, education, targetExams } = req.body; 
+
+    const user = await User.findById(req.user.id || req.user._id);
+    if (!user) return res.status(404).json({ msg: "User not found" });
+
+    // 2. Baaki fields ke sath targetExams ko bhi update karao
+    if (name) user.name = name;
+    if (tagline !== undefined) user.tagline = tagline;
+    if (city !== undefined) user.city = city;
+    if (state !== undefined) user.state = state;
+    if (bio !== undefined) user.bio = bio;
+    if (skills !== undefined) user.skills = skills;
+    if (experience) user.experience = experience;
+    if (education) user.education = education;
+    
+    // ✨ YAHAN FIX HAI: Target Exams ko database mein save karo
+    if (targetExams !== undefined) {
+      user.targetExams = targetExams;
+    }
+
+    await user.save();
+    res.json(user);
+  } catch (err) {
+    console.error("Profile Update Error:", err.message);
+    res.status(500).send("Server Error");
+  }
+};
+
+module.exports = { registerUser, loginUser, getUserProfile, updateProfile };

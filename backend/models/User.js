@@ -24,7 +24,10 @@ const UserSchema = new mongoose.Schema({
   city: { type: String, default: '' },
   state: { type: String, default: '' },
   bio: { type: String, default: '' },
-  skills: { type: String, default: '' },
+  targetExams: {
+  type: [String], // Array of strings format
+  default: []
+},
   
   experience: [{
       title: String, company: String, location: String,
