@@ -70,7 +70,7 @@ git clone [https://github.com/your-username/gov-network.git](https://github.com/
 cd gov-network
 ```
 
-###2. Backend Environment Setup
+### 2. Backend Environment Setup
 Navigate to the backend folder, install dependencies, and create a .env file:
 ```bash
 cd backend
@@ -78,9 +78,9 @@ npm install
 ```
 
 Add the following environment keys inside your .env file:
-PORT=5000
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_encryption_key
+* PORT=5000
+* MONGO_URI=your_mongodb_connection_string
+* JWT_SECRET=your_jwt_encryption_key
 
 Start the local backend server engine:
 
@@ -88,7 +88,7 @@ Start the local backend server engine:
 npm start
 ```
 
-###3. Frontend Environment Setup
+### 3. Frontend Environment Setup
 Open a separate terminal window, navigate to the frontend directory, install client dependencies, and start the development server:
 
 ```Bash
@@ -97,7 +97,7 @@ npm install
 npm run dev
 ```
 
-###📝 Code of Conduct & Standards
+### 📝 Code of Conduct & Standards
 * NextGov strictly enforces production-ready clean code metrics and architectural standards:
 * Zero Hardcoding: All profile components, headers, and navigation layers dynamically interface with real database endpoints (e.g., /api/auth/me, /api/network/discover) to support multiple multi-tenant account sessions seamlessly.
 * Strict API Validations: Prevents self-following states, double guidance requests, and checks model structures at the database controller level to stop duplicate/corrupt database entries.
