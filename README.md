@@ -54,6 +54,7 @@ NextGov leverages a modern, decoupled production architecture:
     ├── src/
     │   ├── components/    # Modular UI Elements (Feed, LeftSidebar, BottomNav)
     │   └── App.jsx        # Route handling & global layouts
+```
 
 
 ## ⚙️ Local Development Setup
@@ -67,12 +68,14 @@ Ensure you have **NodeJS** and a **MongoDB Atlas cluster** reference ready.
 ```bash
 git clone [https://github.com/your-username/gov-network.git](https://github.com/your-username/gov-network.git)
 cd gov-network
+```
 
 ###2. Backend Environment Setup
 Navigate to the backend folder, install dependencies, and create a .env file:
 ```bash
 cd backend
 npm install
+```
 
 Add the following environment keys inside your .env file:
 PORT=5000
@@ -83,6 +86,7 @@ Start the local backend server engine:
 
 ```Bash
 npm start
+```
 
 ###3. Frontend Environment Setup
 Open a separate terminal window, navigate to the frontend directory, install client dependencies, and start the development server:
@@ -91,6 +95,7 @@ Open a separate terminal window, navigate to the frontend directory, install cli
 cd frontend
 npm install
 npm run dev
+```
 
 ###📝 Code of Conduct & Standards
 * NextGov strictly enforces production-ready clean code metrics and architectural standards:
