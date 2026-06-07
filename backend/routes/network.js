@@ -3,15 +3,15 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Post = require('../models/Post');
+const Notification = require('../models/Notification'); // 🚀 1. NOTIFICATION MODEL IMPORT
 
 // 1. DISCOVER: Get users to connect with (excluding yourself)
 router.get('/discover', protect, async (req, res) => {
   try {
     const userId = req.user.id ? req.user.id : req.user;
     
-    // Find all users EXCEPT the currently logged-in user
     const users = await User.find({ _id: { $ne: userId } })
-                            .select('-password -email') // Hide private info
+                            .select('-password -email') 
                             .limit(50); 
     res.json(users);
   } catch (err) {
@@ -26,7 +26,7 @@ router.post('/follow/:id', protect, async (req, res) => {
     const currentUserId = req.user.id ? req.user.id : req.user;
     const targetUserId = req.params.id;
 
-    if (currentUserId === targetUserId) {
+    if (currentUserId.toString() === targetUserId.toString()) {
       return res.status(400).json({ msg: "You cannot follow yourself" });
     }
 
@@ -35,17 +35,23 @@ router.post('/follow/:id', protect, async (req, res) => {
 
     if (!targetUser) return res.status(404).json({ msg: "User not found" });
 
-    // Prevent double-following
     if (currentUser.following.includes(targetUserId)) {
       return res.status(400).json({ msg: "Already following this user" });
     }
 
-    // Add target to current user's 'following', and current user to target's 'followers'
     currentUser.following.push(targetUserId);
     targetUser.followers.push(currentUserId);
 
     await currentUser.save();
     await targetUser.save();
+
+    // ✨ TRIGGER: Follow Notification Create Karo
+    await Notification.create({
+      recipient: targetUserId,              // Jisko follow kiya
+      fromUser: currentUserId.toString(),   // Jisne follow kiya
+      type: 'follow',
+      message: 'started following you.'
+    });
 
     res.json({ msg: "Successfully followed user", following: currentUser.following });
   } catch (err) {
@@ -65,12 +71,10 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
 
     if (!targetUser) return res.status(404).json({ msg: "User not found" });
 
-    // Guardrail: Only allow guidance requests to Officials
     if (targetUser.role !== 'official') {
         return res.status(400).json({ msg: "You can only request guidance from verified Officials." });
     }
 
-    // Prevent spamming requests
     const alreadyRequested = targetUser.mentorshipRequests.find(
         req => req.fromUser.toString() === currentUserId.toString()
     );
@@ -79,7 +83,6 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
         return res.status(400).json({ msg: "Guidance request already sent and is pending." });
     }
 
-    // Add the request to the Official's inbox
     targetUser.mentorshipRequests.push({
         fromUser: currentUserId,
         message: message || "I would like to request your professional guidance.",
@@ -87,6 +90,14 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
     });
 
     await targetUser.save();
+
+    // ✨ TRIGGER: Mentorship Request Notification Create Karo
+    await Notification.create({
+      recipient: targetUserId,              // Official jise request bheji
+      fromUser: currentUserId.toString(),   // Aspirant jisne request ki
+      type: 'mentorship_request',
+      message: 'wants to connect with you for mentorship.'
+    });
 
     res.json({ msg: "Guidance request sent successfully!" });
   } catch (err) {
@@ -100,19 +111,16 @@ router.get('/user/:id', protect, async (req, res) => {
   try {
     const targetUserId = req.params.id;
 
-    // 1. Fetch the user's profile (hiding their private email and password)
     const profile = await User.findById(targetUserId).select('-password -email');
     
     if (!profile) {
       return res.status(404).json({ msg: "User not found" });
     }
 
-    // 2. Fetch only the posts created by this specific user
     const posts = await Post.find({ user: targetUserId })
-                            .populate('user', 'name role') // Get author details
-                            .sort({ createdAt: -1 });      // Newest first
+                            .populate('user', 'name role') 
+                            .sort({ createdAt: -1 });      
 
-    // 3. Package them together and send them to the frontend
     res.json({ 
         profile: profile, 
         posts: posts 
@@ -120,8 +128,6 @@ router.get('/user/:id', protect, async (req, res) => {
 
   } catch (err) {
     console.error("Creator Page Error:", err.message);
-    
-    // If the frontend sends a weird/invalid ID format, catch it gracefully
     if (err.kind === 'ObjectId') {
       return res.status(404).json({ msg: "User not found" }); 
     }

@@ -1,5 +1,6 @@
 const Post = require('../models/Post');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 
 const createPost = async (req, res) => {
   try {
@@ -59,6 +60,17 @@ const likePost = async (req, res) => {
       post.likes.splice(index, 1);
     } else {
       post.likes.push(userIdStr);
+
+      // ✨ REAL-TIME TRIGGER: Agar doosre user ki post hai, toh notification insert karo
+      if (post.user && post.user.toString() !== userIdStr) {
+        await Notification.create({
+          recipient: post.user, // Post likhne wala user
+          fromUser: userIdStr,  // Like karne wala user
+          type: 'like',
+          postId: post._id,
+          message: 'liked your post.'
+        });
+      }
     }
 
     await post.save();
