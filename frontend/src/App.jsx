@@ -13,22 +13,19 @@ import SinglePostView from './components/SinglePostView';
 import SearchResults from './components/SearchResults';
 import PageProfile from './components/PageProfile';
 import Auth from './components/Auth';
+import Notifications from './components/Notifications'; // 🚀 1. NEW COMPONENT IMPORT
 
-// 🚀 NEW APP SHELL COMPONENTS
+// NEW APP SHELL COMPONENTS
 import LeftSidebar from './components/LeftSidebar';
 import RightSidebar from './components/RightSidebar';
 import BottomNav from './components/BottomNav';
 
-// 🚀 UPDATED MODULAR AuthenticatedLayout (Mobile Responsive App Shell)
+// UPDATED MODULAR AuthenticatedLayout (Mobile Responsive App Shell)
 const AuthenticatedLayout = ({ children, handleLogout }) => {
   return (
     <div className="min-h-screen bg-[#F4F6F8]">
       <Navbar handleLogout={handleLogout} />
       
-      {/* Main Grid Setup: 
-        - pb-24: Mobile mein bottom nav ke neeche content chhupne se bachane ke liye.
-        - grid-cols-1 md:grid-cols-12: Mobile pe 1 column, Desktop pe 12 column.
-      */}
       <main className="max-w-7xl mx-auto px-4 pt-6 pb-24 md:pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
         
         {/* LEFT SIDEBAR (Hidden on mobile, 3 columns on desktop) */}
@@ -85,6 +82,10 @@ function App() {
         <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
+        
+        {/* 🚀 2. DYNAMIC NOTIFICATIONS ROUTE BINDING */}
+        <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Notifications /></AuthenticatedLayout></ProtectedRoute>} />
+        
         <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
