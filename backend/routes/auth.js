@@ -1,41 +1,32 @@
+// backend/routes/auth.js
+
 const express = require('express');
 const router = express.Router();
-const { registerUser, loginUser, getUserProfile } = require('../controllers/authController');
+const { 
+  requestOtp, 
+  verifyOtpAndRegister, 
+  loginUser, 
+  getUserProfile, 
+  updateProfile 
+} = require('../controllers/authController');
 const protect = require('../middleware/authMiddleware'); 
-const User = require('../models/User'); 
+// 🚀 Enforcing accurate validation mappings
+const { validateRegistrationPayload, validateOtpPayload } = require('../middleware/validate'); 
 
-router.post('/register', registerUser);
+// 1. Step 1: Request OTP Initialization Code
+router.post('/request-otp', requestOtp);
+
+// 2. Step 2: Validate tokens matching fields configuration
+// ✨ FIX HAPPENED HERE: Changed validator to validateOtpPayload
+router.post('/verify-otp', validateOtpPayload, verifyOtpAndRegister);
+
+// 3. Independent Login Route
 router.post('/login', loginUser);
+
+// 4. Authenticated Session Retrieval Hook
 router.get('/me', protect, getUserProfile); 
 
-// Update User Profile
-router.put('/profile', protect, async (req, res) => { 
-  try {
-    // FIX: Because req.user is ALREADY the string ID from the middleware!
-    const userId = req.user.id ? req.user.id : req.user; 
-    
-    const { 
-      name, tagline, city, state, bio, skills, experience, education 
-    } = req.body;
-    
-    const updatedUser = await User.findByIdAndUpdate(
-      userId,
-      { $set: { 
-          name, tagline, city, state, bio, skills, experience, education 
-        } 
-      },
-      { new: true } 
-    ).select('-password'); 
-
-    if (!updatedUser) {
-      return res.status(404).send('User not found in database.');
-    }
-
-    res.json(updatedUser);
-  } catch (err) {
-    console.error("Profile Update Error:", err.message);
-    res.status(500).send('Server Error');
-  }
-});
+// 5. Modular Profile Update
+router.put('/profile', protect, updateProfile);
 
 module.exports = router;

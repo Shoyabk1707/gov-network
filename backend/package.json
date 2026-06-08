@@ -15,7 +15,12 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-joi-validation": "^6.1.0",
+    "express-rate-limit": "^8.5.2",
+    "ioredis": "^5.11.1",
+    "joi": "^17.13.3",
     "jsonwebtoken": "^9.0.3",
-    "mongoose": "^9.6.3"
+    "mongoose": "^9.6.3",
+    "nodemailer": "^8.0.10"
   }
 }
