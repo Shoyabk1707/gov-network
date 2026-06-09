@@ -1,9 +1,9 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  secure: process.env.SMTP_PORT == 465, // true for 465, false for other ports
+  host: '74.125.141.108', // Direct standard IP mapping for smtp.gmail.com
+  port: parseInt(process.env.SMTP_PORT) || 587,
+  secure: false, // 587 uses false, then upgrades via STARTTLS
   pool: true, 
   maxConnections: 5, 
   maxMessages: 100, 
@@ -11,9 +11,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
-  // 🚀 ENTERPRISE LOCAL FIX: Allow self-signed certificates in dev/testing environments
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
   }
 });
 
