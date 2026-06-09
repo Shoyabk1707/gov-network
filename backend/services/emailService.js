@@ -1,24 +1,29 @@
-// backend/utils/emailService.js
+// backend/services/emailService.js
 const axios = require('axios');
 const { mailConfig, transporter } = require('../config/mailer');
 
-/**
- * Enterprise Gatekeeper: Decides between HTTP API Proxy and Native SMTP Transport Layer
- * @param {Object} options - { from, to, subject, html }
- */
 const sendEmail = async (options) => {
   const { from, to, subject, html } = options;
 
-  // 1. Condition Verification Loop: Cloud API Route Active?
   if (mailConfig.useMailApi) {
     try {
-      console.log(`📡 Route Selection: Bypassing SMTP. Triggering Proxy Web API Framework...`);
+      console.log(`📡 Route Selection: Triggering Proxy Web API Framework...`);
+      console.log(`🔗 Destination Node: ${mailConfig.api.endpoint}`);
       
+      // ProMailer API dynamic request execution structure
       const response = await axios.post(
         mailConfig.api.endpoint,
-        { from, to, subject, html }, // Strictly formatted JSON Payload Structure
+        { 
+          // Payload matching ProMailer pipeline specs
+          from: from,
+          to: to,
+          subject: subject,
+          html: html 
+        }, 
         {
           headers: {
+            // Standard dual-mapping for token verification
+            'X-API-Key': mailConfig.api.key,
             'Authorization': `Bearer ${mailConfig.api.key}`,
             'Content-Type': 'application/json'
           }
@@ -28,20 +33,24 @@ const sendEmail = async (options) => {
       console.log('🚀 Email Dispatched Successfully via Proxy API Gateway Network Node!');
       return response.data;
     } catch (error) {
-      console.error('❌ Proxy API Gateway Pipeline Core Dropped:', error.response?.data || error.message);
-      throw new Error('Proxy API Mailer System Error');
+      // Is isolated logging block se Render logs par clear ho jayega ki kya dikkat hai
+      if (error.response) {
+        console.error('❌ ProMailer Server Responded with Error Data:', error.response.data);
+        console.error('❌ Status Code Received:', error.response.status);
+      } else if (error.request) {
+        console.error('❌ No Response Received from Proxy Gateway Network Object:', error.request);
+      } else {
+        console.error('❌ Axios Pipeline Processing Trigger Error:', error.message);
+      }
+      throw new Error(`Proxy API System Execution Failure: ${error.message}`);
     }
-  }
-
-  // 2. Fallback Path: Native SMTP Engine Active (For Local Development Node)
-  else {
+  } else {
     try {
       console.log(`🔌 Route Selection: API Bridge Disabled. Invoking Native SMTP Transport Loop...`);
-      
       if (!transporter) throw new Error('Nodemailer transporter instantiation reference missing');
       
       const info = await transporter.sendMail({ from, to, subject, html });
-      console.log('🚀 Email Dispatched Successfully via Native SMTP Mail Pool Instance ID:', info.messageId);
+      console.log('🚀 Email Dispatched Successfully via Native SMTP Instance:', info.messageId);
       return info;
     } catch (error) {
       console.error('❌ Native SMTP Core Handler Interrupted:', error.message);
@@ -50,12 +59,10 @@ const sendEmail = async (options) => {
   }
 };
 
-/**
- * Domain Wrapper Hook for Auth Controller Flow
- */
 const sendOtpEmail = async (email, otp) => {
   const mailOptions = {
-    from: mailConfig.useMailApi ? '"NextGov System" <onboarding@promailer.xyz>' : `"NextGov Network" <${mailConfig.smtp.user}>`,
+    // ProMailer requires authenticated source address matching the connection profile
+    from: `"NextGov System" <tuber9160@gmail.com>`, 
     to: email,
     subject: '🏛️ NextGov Security: Identity Verification Code',
     html: `
