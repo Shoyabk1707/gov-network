@@ -3,57 +3,48 @@ const axios = require('axios');
 const { mailConfig, transporter } = require('../config/mailer');
 
 const sendEmail = async (options) => {
-  const { from, to, subject, html } = options;
+  const { to, subject, html } = options;
 
   if (mailConfig.useMailApi) {
     try {
-      console.log(`📡 Route Selection: Triggering Proxy Web API Framework...`);
-      console.log(`🔗 Destination Node: ${mailConfig.api.endpoint}`);
+      console.log(`📡 Route Selection: Triggering Official Proxy API Subsystem...`);
       
-      // ProMailer API dynamic request execution structure
       const response = await axios.post(
         mailConfig.api.endpoint,
         { 
-          // Payload matching ProMailer pipeline specs
-          from: from,
           to: to,
           subject: subject,
           html: html 
         }, 
         {
           headers: {
-            // Standard dual-mapping for token verification
-            'X-API-Key': mailConfig.api.key,
             'Authorization': `Bearer ${mailConfig.api.key}`,
             'Content-Type': 'application/json'
-          }
+          },
+          timeout: 60000 // ⏱️ Docs Specification: 60 seconds timeout guard
         }
       );
 
-      console.log('🚀 Email Dispatched Successfully via Proxy API Gateway Network Node!');
+      console.log('🚀 Email Dispatched Successfully via AutomationLounge Gateway!');
       return response.data;
     } catch (error) {
-      // Is isolated logging block se Render logs par clear ho jayega ki kya dikkat hai
       if (error.response) {
-        console.error('❌ ProMailer Server Responded with Error Data:', error.response.data);
-        console.error('❌ Status Code Received:', error.response.status);
-      } else if (error.request) {
-        console.error('❌ No Response Received from Proxy Gateway Network Object:', error.request);
+        console.error('❌ Mail Server Rejected Request:', error.response.data);
       } else {
-        console.error('❌ Axios Pipeline Processing Trigger Error:', error.message);
+        console.error('❌ Network Pipeline Error:', error.message);
       }
-      throw new Error(`Proxy API System Execution Failure: ${error.message}`);
+      throw new Error(`Proxy Mailer API Refused Session: ${error.message}`);
     }
   } else {
     try {
-      console.log(`🔌 Route Selection: API Bridge Disabled. Invoking Native SMTP Transport Loop...`);
-      if (!transporter) throw new Error('Nodemailer transporter instantiation reference missing');
+      console.log(`🔌 Route Selection: API Bridge Disabled. Invoking Native SMTP...`);
+      if (!transporter) throw new Error('Nodemailer transporter instance missing');
       
-      const info = await transporter.sendMail({ from, to, subject, html });
-      console.log('🚀 Email Dispatched Successfully via Native SMTP Instance:', info.messageId);
+      const info = await transporter.sendMail(options);
+      console.log('🚀 Email Dispatched Successfully via Native SMTP:', info.messageId);
       return info;
     } catch (error) {
-      console.error('❌ Native SMTP Core Handler Interrupted:', error.message);
+      console.error('❌ Native SMTP Core Interrupted:', error.message);
       throw error;
     }
   }
@@ -61,8 +52,6 @@ const sendEmail = async (options) => {
 
 const sendOtpEmail = async (email, otp) => {
   const mailOptions = {
-    // ProMailer requires authenticated source address matching the connection profile
-    from: `"NextGov System" <tuber9160@gmail.com>`, 
     to: email,
     subject: '🏛️ NextGov Security: Identity Verification Code',
     html: `
