@@ -7,45 +7,38 @@ import Navbar from './components/Navbar';
 import Feed from './components/Feed';
 import Profile from './components/Profile';
 import Network from './components/Network';
-import CreatorProfile from './components/CreatorProfile';
+import UserProfile from './components/UserProfile'; // ✨ FIX: Changed from CreatorProfile to UserProfile
 import ManagePages from './components/ManagePages';
 import SinglePostView from './components/SinglePostView';
 import SearchResults from './components/SearchResults';
 import PageProfile from './components/PageProfile';
 import Auth from './components/Auth';
-import Notifications from './components/Notifications'; // 🚀 1. NEW COMPONENT IMPORT
+import Notifications from './components/Notifications'; 
 
 // NEW APP SHELL COMPONENTS
 import LeftSidebar from './components/LeftSidebar';
 import RightSidebar from './components/RightSidebar';
 import BottomNav from './components/BottomNav';
 
-// UPDATED MODULAR AuthenticatedLayout (Mobile Responsive App Shell)
 const AuthenticatedLayout = ({ children, handleLogout }) => {
   return (
     <div className="min-h-screen bg-[#F4F6F8]">
       <Navbar handleLogout={handleLogout} />
       
       <main className="max-w-7xl mx-auto px-4 pt-6 pb-24 md:pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-        
-        {/* LEFT SIDEBAR (Hidden on mobile, 3 columns on desktop) */}
         <div className="hidden md:block md:col-span-3">
           <LeftSidebar />
         </div>
 
-        {/* DYNAMIC CENTER CONTENT (Full width on mobile, 6 columns on desktop) */}
         <div className="col-span-1 md:col-span-6">
           {children}
         </div>
 
-        {/* RIGHT SIDEBAR (Hidden on mobile/tablet, 3 columns on large desktop) */}
         <div className="hidden lg:block lg:col-span-3">
           <RightSidebar />
         </div>
-        
       </main>
 
-      {/* BOTTOM NAVIGATION (Only visible on mobile) */}
       <BottomNav />
     </div>
   );
@@ -82,11 +75,11 @@ function App() {
         <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
-        
-        {/* 🚀 2. DYNAMIC NOTIFICATIONS ROUTE BINDING */}
         <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Notifications /></AuthenticatedLayout></ProtectedRoute>} />
         
-        <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><CreatorProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
+        {/* ✨ FIX: Render UserProfileWrapper now instead of CreatorProfileWrapper */}
+        <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><UserProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
+        
         <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
@@ -100,10 +93,11 @@ function App() {
   );
 }
 
-const CreatorProfileWrapper = () => {
+// ✨ FIX: Renamed Wrapper to match the new clean dynamic profile mapping
+const UserProfileWrapper = () => {
   const { userId } = useParams();
   const navigate = useNavigate();
-  return <CreatorProfile userId={userId} onBack={() => navigate('/network')} />;
+  return <UserProfile userId={userId} onBack={() => navigate('/network')} />;
 };
 
 export default App;
