@@ -155,25 +155,57 @@ export default function Profile() {
 
   const saveToDatabase = async (updatedFields) => {
     try {
-      let payload = { ...user, ...updatedFields };
-      // If targetExams was updated in formData, convert it back to array if it's a string
+      // 🛠️ SANITIZED CLEAN PAYLOAD STRUCTURE
+      // Sirf wahi clean fields bhejna hai jo backend controller accept karta hai
+      let payload = {
+        name: formData.name || user.name,
+        tagline: formData.tagline || user.tagline,
+        city: formData.city || user.city,
+        state: formData.state || user.state,
+        bio: formData.bio || user.bio,
+        experience: updatedFields.experience !== undefined ? updatedFields.experience : user.experience,
+        education: updatedFields.education !== undefined ? updatedFields.education : user.education,
+      };
+
+      // Target Exams dynamically handle conversion from string to array safely
       if (updatedFields.targetExams !== undefined && typeof updatedFields.targetExams === 'string') {
-         payload.targetExams = updatedFields.targetExams.split(',').map(e => e.trim()).filter(e => e);
+        payload.targetExams = updatedFields.targetExams.split(',').map(e => e.trim()).filter(e => e);
+      } else if (formData.targetExams && typeof formData.targetExams === 'string') {
+        payload.targetExams = formData.targetExams.split(',').map(e => e.trim()).filter(e => e);
+      } else {
+        payload.targetExams = user.targetExams;
       }
+
+      console.log("📡 Sending Clean Profile Payload Parameters:", payload);
+
       const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify(payload)
       });
       
+      const responseData = await res.json();
+
       if (res.ok) {
-        setUser(await res.json()); 
+        setUser(responseData); // Update profile state securely with clean object from DB
         setShowEditModal(false); setShowExpModal(false); setShowEduModal(false);
         setExpData({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
         setEduData({ school: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
         toast.success("Profile updated successfully! ✨");
-      } else toast.error(`Backend Error`);
-    } catch (err) { toast.error(`Network Error`); }
+        
+        // Dynamic full-sync update values placeholder
+        fetchProfileData(); 
+      } else {
+        console.error(`❌ Backend Profile Processing Refused:`, responseData);
+        toast.error(responseData.message || `Backend Error`);
+      }
+    } catch (err) { 
+      console.error("❌ Profile Update Network Fault:", err);
+      toast.error(`Network Error`); 
+    }
   };
 
   if (!user) {
