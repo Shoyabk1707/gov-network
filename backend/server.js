@@ -11,19 +11,26 @@ connectDB();
 
 // 🌐 PREMIUM CONFIGURATION FOR CORS
 const allowedOrigins = [
-  'http://localhost:5173',          
-  'https://gov-network.vercel.app'  
+  'http://localhost:5173', 
+  'https://gov-network.vercel.app',
+  'https://gov-network-1m0wj5zq7-gov-network-s-projects.vercel.app/'
 ];
 
-// Ye akela block hi kaafi hai saare Preflight aur CORS handle karne ke liye
+
 app.use(cors({
+  // Is function se local localhost aur Vercel ke saare subdomains/preview links automatic allow ho jayenge
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
+    
+    const isLocalhost = origin.startsWith('http://localhost:');
+    const isVercel = origin.endsWith('.vercel.app');
+    
+    if (isLocalhost || isVercel) {
+      return callback(null, true);
+    } else {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
     }
-    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
