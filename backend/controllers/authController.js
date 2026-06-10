@@ -145,7 +145,7 @@ const updateProfile = async (req, res) => {
   try {
     const { name, tagline, city, state, bio, skills, experience, education, targetExams } = req.body; 
 
-    const user = await User.findById(req.user.id || req.user._id);
+    const user = await User.findById(req.user || req.user.id || req.user._id);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
     if (name) user.name = name;
