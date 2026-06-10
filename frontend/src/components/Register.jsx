@@ -138,7 +138,7 @@ export default function Register() {
             >
               <div className="bg-gray-100/80 text-gray-600 p-2.5 rounded-lg h-fit text-lg">💼</div>
               <div>
-                <h3 className="font-semibold text-gray-900 text-sm">Government Official</h3>
+                <h3 className="font-semibold text-gray-900 text-sm">GGGovernment Official</h3>
                 <p className="text-xs text-gray-500 mt-0.5 leading-snug">Verified profile • Mentorship access • Secure communications</p>
               </div>
             </div>

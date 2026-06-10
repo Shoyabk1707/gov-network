@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config';
 import toast from 'react-hot-toast';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(false); 
-  const [step, setStep] = useState(1); // 🚀 Multi-step registration wizard pointer
-  const [timer, setTimer] = useState(300); // 5-minute linear countdown tracking (in seconds)
+  const [step, setStep] = useState(1); 
+  const [timer, setTimer] = useState(300); 
   const [isResendDisabled, setIsResendDisabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
+  // ✨ FIX: Removed "role" from the initial unified state
   const [formData, setFormData] = useState({
-    name: '', email: '', password: '', role: 'aspirant', otp: ''
+    name: '', email: '', password: '', otp: ''
   });
 
-  // --- ⏰ INLINE EXPIRY TIMER ENGINE ---
   useEffect(() => {
     let interval = null;
     if (!isLogin && step === 2 && timer > 0) {
@@ -21,7 +22,7 @@ export default function Auth() {
         setTimer((prev) => prev - 1);
       }, 1000);
     } else if (timer === 0) {
-      setIsResendDisabled(false); // Throttle threshold complete. Enable resend hook.
+      setIsResendDisabled(false); 
       clearInterval(interval);
     }
     return () => clearInterval(interval);
@@ -31,11 +32,40 @@ export default function Auth() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleRoleChange = (selectedRole) => {
-    setFormData({ ...formData, role: selectedRole });
+  // ==========================================
+  // 🚀 GOOGLE AUTHENTICATION HANDLER
+  // ==========================================
+  const handleGoogleSuccess = async (credentialResponse) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: credentialResponse.credential }),
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        localStorage.setItem('token', data.token);
+        toast.success(data.message || 'Google Auth successful! Redirecting... ✨');
+        setTimeout(() => {
+          window.location.href = '/'; 
+        }, 1000);
+      } else {
+        toast.error(data.message || "Google Authentication failed.");
+      }
+    } catch (error) {
+      toast.error("Server connection failed during Google Auth!");
+    }
   };
 
-  // --- 🚀 PHASE 1: SUBMIT CREDENTIALS & REQUEST SECURE OTP TOKEN ---
+  const handleGoogleError = () => {
+    toast.error("Google Sign-In was cancelled or failed.");
+  };
+
+  // ==========================================
+  // 🚀 STANDARD EMAIL/PASSWORD PIPELINE
+  // ==========================================
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -50,8 +80,8 @@ export default function Auth() {
 
       if (response.ok) {
         toast.success(resData.message || 'Verification token dispatched! Check your inbox. 🏛️');
-        setStep(2); // Progress state seamlessly to OTP display layer
-        setTimer(300); // Hard reset counter parameters pool allocation
+        setStep(2); 
+        setTimer(300); 
         setIsResendDisabled(true);
       } else {
         toast.error(resData.message || 'System verification setup dropped.');
@@ -63,40 +93,38 @@ export default function Auth() {
     }
   };
 
-  // --- 🚀 PHASE 2: COLLECT OTP DIGITS & ATOMIC WRITE COMMIT ---
   const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
     if (!formData.otp || formData.otp.length !== 6) {
-      return toast.error('Verification code parameters must span exactly 6 digits.');
+      return toast.error('Verification code must span exactly 6 digits.');
     }
     setLoading(true);
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData) // Dispatches sanitized properties payload context
+        body: JSON.stringify(formData) // Dispatches unified payload safely
       });
 
       const resData = await response.json();
 
       if (response.ok) {
-        toast.success('Identity authorized! Establishing session context... ✨');
+        toast.success('Identity authorized! Establishing session... ✨');
         localStorage.setItem('token', resData.token);
         
         setTimeout(() => {
           window.location.href = '/'; 
         }, 1000);
       } else {
-        toast.error(resData.message || 'Authentication validation sequence aborted.');
+        toast.error(resData.message || 'Authentication sequence aborted.');
       }
     } catch (err) {
-      toast.error('Server serialization layer unreachable.');
+      toast.error('Server connection failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  // --- 🔐 CORE PASSIVE AUTH ENGINE: SIGN IN ROUTINE ---
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -128,7 +156,6 @@ export default function Auth() {
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-2xl shadow-sm border border-gray-100 transition-all">
       
-      {/* Dynamic Tab Selector Matrix */}
       <div className="flex bg-slate-50 rounded-lg p-1 mb-6">
         <button 
           type="button"
@@ -150,64 +177,53 @@ export default function Auth() {
         </button>
       </div>
 
-      {/* ==========================================
-          ⚙️ LOGIN PIPELINE SCREEN
-          ========================================== */}
       {isLogin ? (
-        <form onSubmit={handleLoginSubmit} className="space-y-4 animate-fadeIn">
-          <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
-          <input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
-
-          <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded-lg hover:bg-slate-800 transition flex justify-center items-center gap-2 mt-4 font-bold text-sm shadow-sm">
-            Sign in →
-          </button>
-        </form>
-      ) : (
-        /* ==========================================
-           ⚙️ REGISTER WIZARD STAGE 1: SUBMIT BASE CREDENTIALS
-           ========================================== */
-        step === 1 ? (
-          <form onSubmit={handleRegisterSubmit} className="space-y-4 animate-fadeIn">
-            <div className="mb-6 space-y-3 text-left">
-              <p className="text-sm font-medium text-gray-800">I'm joining as a...</p>
-              
-              <div onClick={() => handleRoleChange('official')} className={`p-3 border rounded-xl flex gap-3 cursor-pointer transition-all ${formData.role === 'official' ? 'border-blue-600 bg-blue-50/50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
-                <div className="bg-gray-100/80 text-gray-600 p-2.5 rounded-lg h-fit text-lg">💼</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Government Official</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">Verified profile • Mentorship toggle • Spam-free inbox</p>
-                </div>
-              </div>
-
-              <div onClick={() => handleRoleChange('aspirant')} className={`p-3 border rounded-xl flex gap-3 cursor-pointer transition-all ${formData.role === 'aspirant' ? 'border-blue-600 bg-blue-50/50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
-                <div className="bg-gray-100/80 text-gray-600 p-2.5 rounded-lg h-fit text-lg">🎓</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Exam Aspirant</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">Follow officials & institutes • Request guidance • Track prep</p>
-                </div>
-              </div>
-
-              <div onClick={() => handleRoleChange('creator')} className={`p-3 border rounded-xl flex gap-3 cursor-pointer transition-all ${formData.role === 'creator' ? 'border-blue-600 bg-blue-50/50 shadow-sm' : 'border-gray-200 hover:border-gray-300'}`}>
-                <div className="bg-gray-100/80 text-gray-600 p-2.5 rounded-lg h-fit text-lg">🏢</div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-sm">Creator / Institute</h3>
-                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">Post syllabus updates, job alerts and study materials</p>
-                </div>
-              </div>
-            </div>
-
-            <input type="text" name="name" placeholder="Full name" value={formData.name} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
-            <input type="email" name="email" placeholder="Official / personal email" value={formData.email} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
+        <div className="space-y-4 animate-fadeIn">
+          <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
             <input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
 
-            <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white p-3 rounded-lg hover:bg-slate-800 transition flex justify-center items-center gap-2 mt-4 font-bold text-sm shadow-sm disabled:opacity-50">
-              {loading ? 'Processing network handshakes...' : 'Get Verification Code →'}
+            <button type="submit" className="w-full bg-slate-900 text-white p-3 rounded-lg hover:bg-slate-800 transition flex justify-center items-center gap-2 mt-4 font-bold text-sm shadow-sm">
+              Sign in →
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-semibold uppercase tracking-wider">OR</span>
+            <div className="flex-grow border-t border-gray-200"></div>
+          </div>
+
+          {/* Google Auth Button */}
+          <div className="flex justify-center">
+            <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} useOneTap shape="rectangular" size="large" width="350px" />
+          </div>
+        </div>
+      ) : (
+        step === 1 ? (
+          <div className="space-y-4 animate-fadeIn">
+            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              <input type="text" name="name" placeholder="Full name" value={formData.name} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
+              <input type="email" name="email" placeholder="Email address" value={formData.email} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
+              <input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} className="w-full p-3 border border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm font-medium" required />
+
+              <button type="submit" disabled={loading} className="w-full bg-slate-900 text-white p-3 rounded-lg hover:bg-slate-800 transition flex justify-center items-center gap-2 mt-4 font-bold text-sm shadow-sm disabled:opacity-50">
+                {loading ? 'Processing...' : 'Continue with Email →'}
+              </button>
+            </form>
+
+            <div className="relative flex items-center py-2">
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-semibold uppercase tracking-wider">OR</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
+
+            <div className="flex justify-center">
+              <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} shape="rectangular" size="large" text="signup_with" width="350px" />
+            </div>
+          </div>
         ) : (
-          /* ==========================================
-             ⚙️ REGISTER WIZARD STAGE 2: LIVE OTP VERIFICATION OVERLAY
-             ========================================== */
           <form onSubmit={handleVerifyOtpSubmit} className="space-y-5 animate-fadeIn">
             <div className="text-center space-y-2">
               <div className="text-3xl">📧</div>
@@ -225,7 +241,8 @@ export default function Auth() {
                 placeholder="000000" 
                 value={formData.otp}
                 onChange={handleChange}
-                className="w-full p-4 border border-gray-200 rounded-xl text-center text-2xl font-extrabold tracking-[12px] focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all bg-slate-50"
+                // ✨ FIX: Focus ring color ab dark slate me match ho raha hai
+                className="w-full p-4 border border-gray-200 rounded-xl text-center text-2xl font-extrabold tracking-[12px] focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all bg-slate-50"
                 required 
               />
               
@@ -237,7 +254,8 @@ export default function Auth() {
                   type="button"
                   disabled={isResendDisabled || loading}
                   onClick={handleRegisterSubmit}
-                  className="text-blue-600 hover:text-blue-800 transition disabled:opacity-40 disabled:hover:text-blue-600 font-bold"
+                  // ✨ FIX: Resend text color dark slate kar diya hai
+                  className="text-slate-800 hover:text-slate-600 transition disabled:opacity-40 disabled:hover:text-slate-800 font-bold underline"
                 >
                   Resend OTP
                 </button>
@@ -245,7 +263,8 @@ export default function Auth() {
             </div>
 
             <div className="space-y-2 pt-2">
-              <button type="submit" disabled={loading || timer === 0} className="w-full bg-blue-600 text-white p-3.5 rounded-xl hover:bg-blue-700 transition flex justify-center items-center font-bold text-sm shadow-sm disabled:opacity-50">
+              {/* ✨ FIX: Button background dark theme (bg-slate-900) kar diya */}
+              <button type="submit" disabled={loading || timer === 0} className="w-full bg-slate-900 text-white p-3.5 rounded-xl hover:bg-slate-800 transition flex justify-center items-center font-bold text-sm shadow-sm disabled:opacity-50">
                 {loading ? 'Establishing database records...' : 'Confirm Identity & Establish Profile'}
               </button>
               <button 
@@ -261,7 +280,7 @@ export default function Auth() {
       )}
 
       <p className="text-[11px] text-gray-400 text-center mt-6 pt-2 leading-relaxed">
-        NextGov utilizes an automated distributed verification workflow to protect nodes and scale accounts safely.
+        GovNetwork utilizes an automated distributed verification workflow to protect nodes and scale accounts safely.
       </p>
     </div>
   );
