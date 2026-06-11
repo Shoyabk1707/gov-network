@@ -1,127 +1,136 @@
 const Page = require('../models/Page');
-const mongoose = require('mongoose');
 
-// 1. Create a new Institute/Brand Page
+// A. Initialize & Create Page Node
 const createPage = async (req, res) => {
   try {
-    const { name, category, bio } = req.body;
-    
-    let userId;
-    if (typeof req.user === 'string') userId = req.user;
-    else if (req.user && req.user.id) userId = req.user.id;
-    else if (req.user && req.user._id) userId = req.user._id;
-
-    if (!userId) {
-      console.log("Error: User auth object is invalid");
-      return res.status(400).json({ message: 'Authentication error' });
-    }
+    const { name, bio, about, category, website, location, metadata } = req.body;
+    if (!name) return res.status(400).json({ message: 'Page name is required.' });
 
     const newPage = await Page.create({
       name,
-      category,
       bio,
-      admin: userId // Ab yeh pakka save hoga
+      about,
+      category,
+      website,
+      location,
+      metadata: metadata || {}, // Auto dump conditional fields grid safely
+      owner: req.user
     });
 
     res.status(201).json(newPage);
   } catch (error) {
-    console.error('Create Page Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+    console.error("Create Page Error:", error.message);
+    res.status(500).json({ message: 'Server Error initializing page node.' });
   }
 };
 
-// 2. Get all pages managed by the logged-in user
-const getUserPages = async (req, res) => {
+// B. Fetch All Pages Managed by Current Sessions Local node
+const getMyPages = async (req, res) => {
   try {
-    // 🚨 BULLETPROOF ID EXTRACTION
-    let userId;
-    if (typeof req.user === 'string') userId = req.user;
-    else if (req.user && req.user.id) userId = req.user.id;
-    else if (req.user && req.user._id) userId = req.user._id;
-
-    const pages = await Page.find({ admin: userId }).sort({ createdAt: -1 });
+    const pages = await Page.find({ owner: req.user });
     res.json(pages);
   } catch (error) {
-    console.error('Get User Pages Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server Error fetching owner pages.' });
   }
 };
 
+// C. Fetch Single Page Context Parameters By ID
 const getPageById = async (req, res) => {
   try {
-    // Model ka naam check kar lena, agar Page hai toh theek hai
-    const page = await Page.findById(req.params.id);
-    
-    if (!page) {
-      return res.status(404).json({ msg: 'Page not found' });
-    }
-    
+    const page = await Page.findById(req.params.id).populate('owner', 'name email avatar');
+    if (!page) return res.status(404).json({ message: 'Organization page not found.' });
     res.json(page);
-  } catch (err) {
-    console.error("Error fetching single page:", err.message);
-    if (err.kind === 'ObjectId') {
-      return res.status(404).json({ msg: 'Page not found' });
-    }
-    res.status(500).send('Server Error');
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error fetching single page index.' });
   }
 };
 
-// Follow / Unfollow a Page 
-const followPage = async (req, res) => {
+// D. Toggle Follow Connection Matrix Route
+const toggleFollowPage = async (req, res) => {
   try {
     const page = await Page.findById(req.params.id);
-    if (!page) {
-      return res.status(404).json({ msg: 'Page not found' });
-    }
+    if (!page) return res.status(404).json({ message: 'Page not found.' });
 
-    // 1. Get exact User ID
-    let userId = req.user._id || req.user.id || req.user;
-    
-    // 2. Convert string to pure MongoDB ObjectId (Yeh sabse zaroori tha!)
-    const userObjectId = new mongoose.Types.ObjectId(userId);
-
-    // 3. Check if following
-    const isFollowing = page.followers.some(
-      (follower) => follower.toString() === userId.toString()
-    );
-
-    let updatedPage;
+    const userId = req.user;
+    const isFollowing = page.followers.includes(userId);
 
     if (isFollowing) {
-      // 🚨 DIRECT DB WRITE: Remove user
-      updatedPage = await Page.findByIdAndUpdate(
-        page._id, 
-        { $pull: { followers: userObjectId } },
-        { new: true } // Returns the updated document
-      );
+      page.followers = page.followers.filter(f => String(f) !== String(userId));
     } else {
-      // 🚨 DIRECT DB WRITE: Add user
-      updatedPage = await Page.findByIdAndUpdate(
-        page._id, 
-        { $addToSet: { followers: userObjectId } },
-        { new: true }
-      );
+      page.followers.push(userId);
     }
 
-    res.json({ 
-      msg: isFollowing ? 'Unfollowed successfully' : 'Followed successfully', 
-      followers: updatedPage.followers 
-    });
-  } catch (err) {
-    console.error("🔥 Error in followPage:", err);
-    res.status(500).send('Server Error');
-  }
-};
-
-// Get ALL pages for the "Discover" section
-const getAllPages = async (req, res) => {
-  try {
-    const pages = await Page.find().sort({ createdAt: -1 });
-    res.json(pages);
+    await page.save();
+    res.json({ followersCount: page.followers.length, isFollowing: !isFollowing });
   } catch (error) {
-    console.error('Get All Pages Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+    res.status(500).json({ message: 'Server Error managing follow routing loop.' });
   }
 };
 
-module.exports = { createPage, getUserPages, getPageById, followPage, getAllPages };
+// E. Update Brand Page Configurations (PUT Action)
+const updatePage = async (req, res) => {
+  try {
+    const { name, category, bio, about, website, location, metadata } = req.body;
+    const page = await Page.findById(req.params.id);
+
+    if (!page) return res.status(404).json({ message: 'Page instance not found.' });
+    if (String(page.owner) !== String(req.user)) {
+      return res.status(401).json({ message: 'Unauthorized profile ownership action.' });
+    }
+
+    if (name) page.name = name;
+    if (category) page.category = category;
+    if (bio !== undefined) page.bio = bio;
+    if (about !== undefined) page.about = about;
+    if (website !== undefined) page.website = website;
+    if (location !== undefined) page.location = location;
+    
+    // Deeper field validation check before execution
+    if (metadata) {
+      page.metadata = { ...page.metadata, ...metadata };
+    }
+
+    await page.save();
+    res.json(page);
+  } catch (error) {
+    console.error("Update Page Error:", error.message);
+    res.status(500).json({ message: 'Server Error processing data updates.' });
+  }
+};
+
+const getPagePosts = async (req, res) => {
+  try {
+    // Fetch posts targeting this specific page, sorted by newest first
+    // Assuming your Post model has a 'page' field linking to the Page ID
+    const Post = require('../models/Post'); 
+    const posts = await Post.find({ page: req.params.id })
+      .populate('user', 'name avatar')
+      .sort({ createdAt: -1 });
+      
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error fetching page broadcasts.' });
+  }
+};
+
+const deletePage = async (req, res) => {
+  try {
+    const page = await Page.findById(req.params.id);
+    
+    if (!page) {
+      return res.status(404).json({ message: 'Page nahi mila.' });
+    }
+
+    // Check karo ki delete karne wala banda page ka owner hi hai na
+    if (String(page.owner?._id || page.owner) !== String(req.user._id || req.user)) {
+      return res.status(401).json({ message: 'Not authorized to delete this page.' });
+    }
+
+    await page.deleteOne();
+    res.json({ message: 'Page successfully delete ho gaya hai.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server Error during page deletion.' });
+  }
+};
+
+module.exports = { createPage, getMyPages, getPageById, toggleFollowPage, updatePage, getPagePosts, deletePage };
