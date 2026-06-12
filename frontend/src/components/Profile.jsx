@@ -7,7 +7,7 @@ import SkeletonPost from './SkeletonPost';
 // ==========================================
 // 📰 MODULAR POST CARD COMPONENT
 // ==========================================
-const ProfilePostCard = ({ post, author, getInitials, navigate }) => {
+const ProfilePostCard = ({ post, author, getInitials, navigate, token, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const WORD_LIMIT = 25;
 
@@ -16,70 +16,168 @@ const ProfilePostCard = ({ post, author, getInitials, navigate }) => {
   const isLong = words.length > WORD_LIMIT;
   const displayContent = isExpanded ? content : words.slice(0, WORD_LIMIT).join(' ') + (isLong ? '...' : '');
 
+  // Parse logged-in user details to verify state permissions
+  let currentUserId = null;
+  try {
+    const tokenPayload = token ? JSON.parse(atob(token.split('.')[1])) : null;
+    currentUserId = tokenPayload?._id || tokenPayload?.id;
+  } catch (err) {
+    console.error("Token translation issue:", err);
+  }
+
+  const isPagePost = post.page !== null && post.page !== undefined;
+
+// 🔥 CRASH-PROOF IDENTITY MATRIX: Handle both populated objects and raw ID strings safely
+const postAuthorId = post.user?._id || post.user;
+const pageManagerId = post.page?.owner?._id || post.page?.owner;
+
+const isPostAuthor = !isPagePost && postAuthorId && String(postAuthorId) === String(currentUserId);
+const isPageManager = isPagePost && pageManagerId && String(pageManagerId) === String(currentUserId);
+
+// Agar aap post ke asli owner ho toh canDelete true hoga
+const canDelete = isPostAuthor || isPageManager;
+
   const handleActionClick = (e, actionName) => {
     e.stopPropagation();
     toast(`${actionName} clicked! (Backend link pending)`, { icon: '🚧' });
   };
 
+  const handleShare = async (e) => {
+    e.stopPropagation();
+    const postUrl = `${window.location.origin}/post/${post._id}`;
+    try {
+      await navigator.clipboard.writeText(postUrl);
+      toast.success("Link copied to clipboard! 🔗");
+    } catch (err) {
+      toast.error("Failed to copy path link.");
+    }
+  };
+
+  const handleSave = async (e) => {
+    e.stopPropagation();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${post._id}/save`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await res.json();
+      res.ok ? toast.success(data.message) : toast.error(data.message);
+    } catch (err) {
+      toast.error("Error processing notice save loop.");
+    }
+  };
+
   return (
     <div 
       onClick={() => navigate(`/post/${post._id}`)}
-      className="bg-white rounded-2xl shadow-sm border border-gray-200 hover:shadow-md transition cursor-pointer mb-4 overflow-hidden"
+      className="bg-white rounded-2xl border border-gray-200 hover:shadow-md transition-all duration-200 cursor-pointer mb-4 overflow-hidden text-left"
     >
       <div className="p-5">
-        <div className="flex items-start gap-3 mb-3">
-          <div className="w-12 h-12 bg-slate-900 text-white rounded-full flex-shrink-0 flex items-center justify-center font-bold text-lg shadow-sm">
-            {getInitials(author?.name)}
-          </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-bold text-slate-900 text-[15px] hover:text-blue-600 transition">{author?.name || 'Unknown User'}</h3>
-              
-              {/* Dynamic Badge Component inside Feed Cards */}
-              {author?.verifiedAsOfficial && (
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-teal-600 text-white tracking-wider flex items-center gap-1">
-                  🏛️ Verified Official
-                </span>
-              )}
+        <div className="flex justify-between items-start gap-4 mb-3">
+          <div className="flex items-center gap-3">
+            {/* Dynamic Alphabet Letter Avatar */}
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-sm tracking-wide shrink-0 ${
+              isPagePost ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'
+            }`}>
+              {getInitials(author?.name)}
             </div>
-            <p className="text-xs text-slate-600 font-medium mt-0.5">
-              {author?.jobTitle ? `${author.jobTitle} ${author.department ? `at ${author.department}` : ''}` : author?.tagline || 'Network Member'}
-            </p>
-            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-              {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recently'} 
-              <span className="w-1 h-1 bg-slate-300 rounded-full"></span> 
-              <span className="text-slate-800 font-bold">{post.category || 'General Update'}</span>
-            </p>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="font-extrabold text-slate-900 text-sm leading-tight tracking-tight">{author?.name || 'Unknown User'}</h3>
+                {author?.verifiedAsOfficial && (
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase bg-teal-600 text-white tracking-wider">
+                    🏛️ Verified Official
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-400 font-bold mt-0.5 tracking-wide">
+                {author?.jobTitle ? `${author.jobTitle} ${author.department ? `at ${author.department}` : ''}` : author?.tagline || 'Network Member'}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1 font-bold uppercase tracking-wide">
+                {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recently'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            <span className="text-[9px] bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-md font-extrabold uppercase tracking-wider">
+              {post.category || 'General'}
+            </span>
+            
+            {/* 🔥 SECURITY TRIGGER: Delete icon displays ONLY if you own this resource */}
+            {canDelete && (
+              <button 
+                onClick={() => onDelete(post._id)} 
+                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+                title="Delete Post"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
           </div>
         </div>
 
-        <p className="text-[15px] text-slate-800 whitespace-pre-wrap leading-relaxed">
+        <p className="text-[14px] text-slate-800 font-medium whitespace-pre-wrap leading-relaxed pt-0.5">
           {displayContent}
           {isLong && (
-            <span onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }} className="text-slate-500 font-semibold cursor-pointer ml-1 hover:text-blue-600 transition">
+            <span onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }} className="text-slate-500 font-bold cursor-pointer ml-1 hover:underline text-xs">
               {isExpanded ? 'show less' : 'read more'}
             </span>
           )}
         </p>
       </div>
 
-      <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50/50 text-slate-500 font-medium text-sm">
-         <button onClick={(e) => handleActionClick(e, 'Like')} className="flex items-center gap-1.5 hover:text-red-500 transition">
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-           {post.likes?.length || 0}
-         </button>
-         <button onClick={(e) => handleActionClick(e, 'Comment')} className="flex items-center gap-1.5 hover:text-blue-500 transition">
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-           {post.comments?.length || 0}
-         </button>
-         <button onClick={(e) => handleActionClick(e, 'Share')} className="flex items-center gap-1.5 hover:text-blue-500 transition">
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path></svg>
-           Share
-         </button>
-         <button onClick={(e) => handleActionClick(e, 'Save')} className="flex items-center gap-1.5 hover:text-blue-500 transition">
-           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path></svg>
-           Save
-         </button>
+      {/* FOOTER ACTION CONTROL PANEL */}
+      <div 
+        className="pt-2 px-5 pb-4 border-t border-slate-100 flex items-center justify-between" 
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-2 sm:gap-4">
+          <button 
+            onClick={(e) => handleActionClick(e, 'Like')}
+            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 10h4.757a2 2 0 011.708 3.033l-3.668 6.115A2 2 0 0115.086 20H9.172a2 2 0 01-1.664-.89l-3.333-5A2 2 0 015.84 11H10V4a1 1 0 011-1h2a1 1 0 011 1v6z" />
+            </svg>
+            <span>{post.likes?.length || 0}</span>
+          </button>
+
+          <button 
+            onClick={(e) => handleActionClick(e, 'Comment')}
+            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            </svg>
+            <span>{post.comments?.length || 0}</span>
+          </button>
+
+          <button 
+            onClick={handleShare}
+            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+            <span className="hidden sm:inline">Share</span>
+          </button>
+        </div>
+
+        {/* 🔖 SMART ARCHITECTURE VIEW: Hides Save option on your personal profile feeds */}
+        {!canDelete && (
+          <button 
+            onClick={handleSave}
+            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+            <span>Save</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -193,6 +291,26 @@ export default function Profile() {
     }
   };
 
+  // 🔥 CASCADE DELETE ENGINE: Splices state context synchronously
+  const handleDelete = async (postId) => {
+    if (!window.confirm("Are you sure you want to delete this notice?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setUserPosts((prev) => prev.filter(post => post._id !== postId));
+        setSavedPosts((prev) => prev.filter(post => post._id !== postId));
+        toast.success("Deleted successfully! 🗑️");
+      } else {
+        toast.error("Failed to delete post.");
+      }
+    } catch (err) {
+      toast.error("Network error.");
+    }
+  };
+
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto mt-6 px-4 pb-12 animate-pulse">
@@ -285,19 +403,16 @@ export default function Profile() {
         </div>
       )}
 
-      {/* ==========================================
-          🖼️ MAIN PROFILE HERO CELL
-          ========================================== */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn">
+      {/* Profile Info Card Container */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn text-left">
         <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div> 
         
         <div className="px-6 pb-6 relative">
           <div className="absolute -top-16 left-6 z-10">
-            <div className="w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden">
+            <div className="w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden uppercase">
               {user.avatar ? <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" /> : getInitials(user.name)}
             </div> 
             
-            {/* Dynamic Badge Trigger Anchor */}
             {user.verifiedAsOfficial && (
               <div className="absolute bottom-2 right-2 bg-white rounded-full p-0.5 shadow-sm">
                 <svg className="w-6 h-6 text-teal-600 fill-current" viewBox="0 0 20 20">
@@ -321,7 +436,6 @@ export default function Profile() {
             <div className="flex flex-wrap items-center gap-3 mb-2">
               <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{user.name}</h1>
               
-              {/* Central Verification Status Label Core Engine */}
               {user.verificationStatus === 'verified' ? (
                 <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-teal-600 text-white tracking-wider">Verified Official 🏛️</span>
               ) : user.verificationStatus === 'pending' ? (
@@ -354,9 +468,7 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* ==========================================
-          📂 TABS CONTROLLER MATRIX
-          ========================================== */}
+      {/* Tabs Menu Selection Bar */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex p-1">
         {['About', 'Activity', 'Saved'].map(tab => (
           <button
@@ -371,12 +483,9 @@ export default function Profile() {
         ))}
       </div>
 
-      {/* ==========================================
-          📂 VIEW RENDER INJECTOR LOOP
-          ========================================== */}
+      {/* Active Tab View Routing Logic */}
       {activeTab === 'About' && (
-        <div className="space-y-4 animate-fadeIn">
-          
+        <div className="space-y-4 animate-fadeIn text-left">
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 relative">
             <button onClick={() => setShowEditModal(true)} className="absolute top-4 right-5 text-slate-400 hover:text-slate-900 transition">
                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
@@ -387,7 +496,6 @@ export default function Profile() {
             </p>
           </div>
 
-          {/* DYNAMIC SECTION A: TARGET EXAMS MAP (Renders if array has data) */}
           {user.targetExams && user.targetExams.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Targeted Exams Dashboard</h2>
@@ -401,7 +509,6 @@ export default function Profile() {
             </div>
           )}
 
-          {/* DYNAMIC SECTION B: EXPERIENCE RECORD */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Experience History</h2>
@@ -421,7 +528,6 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* DYNAMIC SECTION C: ACADEMIC EDUCATION RECORD */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Education Credentials</h2>
@@ -446,7 +552,17 @@ export default function Profile() {
       {activeTab === 'Activity' && (
         <div className="space-y-4 animate-fadeIn">
           {userPosts.length > 0 ? (
-            userPosts.map(post => <ProfilePostCard key={post._id} post={post} author={user} getInitials={getInitials} navigate={navigate} />)
+            userPosts.map(post => (
+              <ProfilePostCard 
+                key={post._id} 
+                post={post} 
+                author={user} 
+                getInitials={getInitials} 
+                navigate={navigate} 
+                token={token}
+                onDelete={handleDelete}
+              />
+            ))
           ) : (
             <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm">
               <p className="text-sm font-medium text-slate-500">No broadcasts shared from your stream yet.</p>
@@ -465,12 +581,14 @@ export default function Profile() {
                 author={post.user || { name: 'Network Node', verifiedAsOfficial: false }} 
                 getInitials={getInitials} 
                 navigate={navigate} 
+                token={token}
+                onDelete={handleDelete}
               />
             ))
           ) : (
-            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm">
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm text-slate-400 font-medium text-xs">
               <span className="text-3xl block mb-2 opacity-50">🔖</span>
-              <p className="text-sm font-medium text-slate-500">No Saved Notices Bookmarked.</p>
+              <p>No Saved Notices Bookmarked.</p>
             </div>
           )}
         </div>

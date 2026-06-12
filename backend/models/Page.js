@@ -27,4 +27,14 @@ const PageSchema = new mongoose.Schema({
   followers: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
 
+PageSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
+  try {
+    const Post = mongoose.model('Post');
+    await Post.deleteMany({ page: this._id });
+    next();
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = mongoose.model('Page', PageSchema);

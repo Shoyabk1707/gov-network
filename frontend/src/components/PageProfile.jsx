@@ -18,8 +18,9 @@ export default function PageProfile() {
   // View Control Hooks
   const [isAdminView, setIsAdminView] = useState(true);
   const [adminActiveMenu, setAdminActiveMenu] = useState('Dashboard'); 
-  const [memberActiveTab, setMemberActiveTab] = useState('Home'); // Dynamic Tab state for members view
+  const [memberActiveTab, setMemberActiveTab] = useState('Home'); 
   const [postFilter, setPostFilter] = useState('General'); 
+  const [selectedPostType, setSelectedPostType] = useState('General'); // 👈 State for selection dropdown
   
   const [newPostContent, setNewPostContent] = useState('');
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
@@ -64,11 +65,9 @@ export default function PageProfile() {
   const renderAdminMode = isOwner && isAdminView;
   const isInstitute = page?.category === 'Coaching Institute' || page?.metadata?.pageType === 'institute';
 
-  // 📁 COMPILE SYSTEM TABS ON MEMBER DEMAND VIEWPORT
   const baseTabs = ['Home', 'About', 'Posts'];
   const memberTabs = isInstitute ? [...baseTabs, 'Jobs', 'People'] : baseTabs;
 
-  // 🖥️ SIDEBAR AUTOMATIC HIDING DISPATCHER LOOP
   useEffect(() => {
     const globalLeftSidebar = document.querySelector('.md\\:col-span-3');
     const globalRightSidebar = document.querySelector('.lg\\:col-span-3');
@@ -134,18 +133,40 @@ export default function PageProfile() {
       const res = await fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content: newPostContent, pageId: id })
+        body: JSON.stringify({ content: newPostContent, pageId: id, postType: selectedPostType }) // 👈 Pass postType safely
       });
 
       if (res.ok) {
         toast.success("Broadcast notice live! 📢");
         setNewPostContent('');
+        setSelectedPostType('General');
         fetchPageDetails(); 
       }
     } catch (err) {
       toast.error("Failed to commit post mapping.");
     } finally {
       setIsSubmittingPost(false);
+    }
+  };
+
+  const handleDeletePage = async () => {
+    const confirmDelete = window.confirm("Kya aap sach me is page ko permanently delete karna chahte hain?");
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/pages/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        toast.success("Page permanently delete ho gaya! 🛑");
+        navigate('/dashboard'); 
+      } else {
+        toast.error("Delete karne me dikkat aayi.");
+      }
+    } catch (err) {
+      toast.error("Server communication failed.");
     }
   };
 
@@ -168,7 +189,19 @@ export default function PageProfile() {
           className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm outline-none font-medium h-20 resize-none focus:ring-1 focus:ring-slate-900"
           placeholder={`What's new at ${page.name}? Share announcements, schedules...`}
         />
-        <div className="flex justify-end">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex items-center gap-2">
+            <label className="text-[11px] font-bold text-slate-400 uppercase">Post Type:</label>
+            <select 
+              value={selectedPostType} 
+              onChange={(e) => setSelectedPostType(e.target.value)}
+              className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:ring-1 focus:ring-slate-900"
+            >
+              <option value="General">General</option>
+              <option value="Exam update">Exam update</option>
+              <option value="Study material">Study material</option>
+            </select>
+          </div>
           <button 
             type="submit" 
             disabled={isSubmittingPost || !newPostContent.trim()}
@@ -180,27 +213,6 @@ export default function PageProfile() {
       </form>
     </div>
   );
-
-  const handleDeletePage = async () => {
-  const confirmDelete = window.confirm("Kya aap sach me is page ko permanently delete karna chahte hain?");
-  if (!confirmDelete) return;
-
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/pages/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-
-    if (res.ok) {
-      toast.success("Page permanently delete ho gaya! 🛑");
-      navigate('/dashboard'); // Ya jahan bhi aapko redirect karna ho
-    } else {
-      toast.error("Delete karne me dikkat aayi.");
-    }
-  } catch (err) {
-    toast.error("Server communication failed.");
-  }
-};
 
   return (
     <div className="w-full mx-auto mt-2 pb-12 animate-fadeIn text-left">
@@ -258,7 +270,13 @@ export default function PageProfile() {
                   <div className="space-y-3">
                     {posts.length > 0 ? (
                       posts.slice(0, 3).map(post => (
-                        <div key={post._id} className="border border-slate-100 p-3 bg-slate-50/60 rounded-xl text-sm font-medium text-slate-800">{post.content}</div>
+                        <div key={post._id} className="border border-slate-100 p-4 bg-slate-50/60 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-1">
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-1">
+                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider">{post.category || 'General'}</span>
+                            <span>📅 {new Date(post.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p className="whitespace-pre-wrap">{post.content}</p>
+                        </div>
                       ))
                     ) : <p className="text-xs text-slate-400 font-medium italic">No updates live.</p>}
                   </div>
@@ -272,9 +290,19 @@ export default function PageProfile() {
                 <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">All Stream Releases ({posts.length})</h3>
                   <div className="space-y-3">
-                    {posts.map(p => (
-                      <div key={p._id} className="p-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-medium text-slate-800">{p.content}</div>
-                    ))}
+                    {posts.length > 0 ? (
+                      posts.map(p => (
+                        <div key={p._id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-1.5">
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider">{p.category || 'General'}</span>
+                            <span>📅 {new Date(p.createdAt).toLocaleDateString()}</span>
+                          </div>
+                          <p className="whitespace-pre-wrap text-slate-900 font-medium">{p.content}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-slate-400 text-xs font-medium">No posts published under this feed management yet.</div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -301,32 +329,31 @@ export default function PageProfile() {
                   <button onClick={() => setShowEditModal(true)} className="text-xs font-extrabold bg-slate-900 text-white px-3 py-1 rounded-lg hover:bg-slate-800 transition">✏️ Edit Fields</button>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  // Settings array map ke andar:
-              {[
-                { title: 'Manage admins', desc: 'Control who manages your page' },
-                { title: 'Manage restricted members', desc: 'See all the restricted members' },
-                { title: 'Manage following', desc: 'See all the pages your page follows' },
-                { title: 'Deactivate page', desc: 'Take your page down temporarily' },
-                { title: 'Delete page', desc: 'Permanently remove this page from platform', isDelete: true } // 🔥 Naya Option
-                ].map((setting, idx) => (
-                  <div 
-                    key={idx} 
-                    onClick={() => {
-                      if (setting.isDelete) {
-                        handleDeletePage(); // 🔥 Delete function call hoga
-                      } else {
-                        toast(`${setting.title} configuration synced!`, { icon: '⚙️' });
-                      }
-                    }}
-                    className={`p-4 flex justify-between items-center hover:bg-slate-50/80 transition cursor-pointer ${setting.isDelete ? 'hover:bg-red-50 text-red-600' : ''}`}
-                  >
-                    <div>
-                      <h4 className={`text-xs font-bold ${setting.isDelete ? 'text-red-600' : 'text-slate-900'}`}>{setting.title}</h4>
-                      <p className="text-[11px] text-slate-400 font-medium mt-0.5">{setting.desc}</p>
+                  {[
+                    { title: 'Manage admins', desc: 'Control who manages your page' },
+                    { title: 'Manage restricted members', desc: 'See all the restricted members' },
+                    { title: 'Manage following', desc: 'See all the pages your page follows' },
+                    { title: 'Deactivate page', desc: 'Take your page down temporarily' },
+                    { title: 'Delete page', desc: 'Permanently remove this page from platform', isDelete: true }
+                  ].map((setting, idx) => (
+                    <div 
+                      key={idx} 
+                      onClick={() => {
+                        if (setting.isDelete) {
+                          handleDeletePage(); 
+                        } else {
+                          toast(`${setting.title} configuration synced!`, { icon: '⚙️' });
+                        }
+                      }}
+                      className={`p-4 flex justify-between items-center hover:bg-slate-50/80 transition cursor-pointer ${setting.isDelete ? 'hover:bg-red-50 text-red-600' : ''}`}
+                    >
+                      <div>
+                        <h4 className={`text-xs font-bold ${setting.isDelete ? 'text-red-600' : 'text-slate-900'}`}>{setting.title}</h4>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">{setting.desc}</p>
+                      </div>
+                      <span className={setting.isDelete ? 'text-red-400' : 'text-slate-400'}>➔</span>
                     </div>
-                    <span className={setting.isDelete ? 'text-red-400' : 'text-slate-400'}>➔</span>
-                  </div>
-                ))}
+                  ))}
                 </div>
               </div>
             )}
@@ -364,7 +391,6 @@ export default function PageProfile() {
             </div>
           </div>
 
-          {/* ✨ NEW ADDED IN MEMBER VIEW: THE DYNAMIC TAB MATRIX CONTROLLER LINK */}
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex p-1 overflow-x-auto hide-scrollbar">
             {memberTabs.map(tab => (
               <button
@@ -379,17 +405,35 @@ export default function PageProfile() {
             ))}
           </div>
 
-          {/* Dynamic Render Pipeline according to active client tab */}
           {memberActiveTab === 'Home' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 space-y-2">
-              <h2 className="text-xs font-bold text-slate-400 tracking-widest uppercase">Overview Channel</h2>
-              <p className="text-sm text-slate-800 font-medium leading-relaxed">{page.bio || 'Welcome to our official network board stream.'}</p>
-              <div className="text-xs text-slate-500 font-bold pt-3 flex gap-4 border-t border-slate-50 mt-2">
-                <span>📍 Base: {page.location || 'India'}</span>
-                {page.website && <a href={page.website} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">🌐 Visit Hub Website</a>}
+          <div className="space-y-3 animate-fadeIn text-left">
+            {posts && posts.length > 0 ? (
+              posts.map(post => (
+                <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
+                      {getInitials(page.name)}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">
+                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-extrabold mr-1 uppercase tracking-wide border border-slate-200">
+                          {post.category || 'General'}
+                        </span>
+                        • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
+                No live broadcast updates shared on this brand profile yet.
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
           {memberActiveTab === 'About' && (
             <div className="space-y-4 animate-fadeIn">
@@ -414,33 +458,52 @@ export default function PageProfile() {
           )}
 
           {memberActiveTab === 'Posts' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
-                {['General', 'Job Updates', 'Study Resources'].map(filter => (
-                  <button key={filter} onClick={() => setPostFilter(filter)} className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${postFilter === filter ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>{filter}</button>
-                ))}
-              </div>
-              
-              <div className="space-y-3">
-                {posts.length > 0 ? (
-                  posts.map(post => (
-                    <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm">{getInitials(page.name)}</div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">{new Date(post.createdAt).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
+        <div className="space-y-4 animate-fadeIn text-left">
+          {/* Clean Category Filter Tabs */}
+          <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+            {['General', 'Exam update', 'Study material'].map(filter => (
+              <button 
+                key={filter} 
+                onClick={() => setPostFilter(filter)} 
+                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${postFilter === filter ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+    
+          {/* Live Rendering Post Grid */}
+          <div className="space-y-3">
+            {posts && posts.filter(post => {
+              // Safe check: category match loop engine bypass execution
+              const targetCategory = post.category || 'General';
+              return targetCategory.trim().toLowerCase() === postFilter.trim().toLowerCase();
+            }).length > 0 ? (
+              posts.filter(post => (post.category || 'General').trim().toLowerCase() === postFilter.trim().toLowerCase()).map(post => (
+                <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
+                      {getInitials(page.name)}
                     </div>
-                  ))
-                ) : <div className="text-center py-8 bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs font-medium">No updates shared under "{postFilter}" tags yet.</div>}
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
+                      <span className="text-[9px] font-bold text-slate-400 uppercase">
+                        {page.category} • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
+                No updates shared under "{postFilter}" tags yet.
               </div>
-            </div>
-          )}
+            )}
+          </div>
+        </div>
+      )}
 
-          {/* Exclusive Extra Member Panels */}
           {memberActiveTab === 'Jobs' && isInstitute && (
             <div className="bg-white rounded-2xl p-6 border border-gray-200 text-center py-12 animate-fadeIn shadow-sm">
               <span className="text-xl block mb-1">💼</span><h4 className="text-sm font-bold text-slate-900">Career Openings Portal</h4>
@@ -457,7 +520,6 @@ export default function PageProfile() {
         </div>
       )}
 
-      {/* COMPONENT SETTINGS FORM POPUP MODAL CONTROL MAP */}
       {showEditModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100">

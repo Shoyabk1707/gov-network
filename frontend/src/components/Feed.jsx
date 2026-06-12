@@ -9,7 +9,9 @@ export default function Feed() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
-  const tabs = ['All', 'Job Updates', 'Networking', 'Study Resources'];
+  
+  // ✨ UPDATED: Pure platform ke liye simplified unified tabs list
+  const tabs = ['All', 'General', 'Exam update', 'Study material'];
   const token = localStorage.getItem('token');
 
   const fetchPosts = async () => {
@@ -49,35 +51,36 @@ export default function Feed() {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) fetchPosts(); // Re-fetch to get updated likes
+      if (res.ok) fetchPosts(); 
     } catch (err) {
       console.error(err);
     }
   };
 
-  // 🔥 FILTER LOGIC
+  // 🔥 UPDATED FILTER LOGIC: Exact database schema values matching system
   const filteredPosts = posts.filter(post => {
     if (activeTab === 'All') return true;
-    if (activeTab === 'Job Updates' && post.category === 'Official Circular') return true;
-    if (activeTab === 'Networking' && post.category === 'Networking') return true;
-    if (activeTab === 'Study Resources' && post.category === 'Study Resources') return true;
-    return post.category === activeTab; 
+    
+    const postCategory = post.category || 'General';
+    return postCategory.trim().toLowerCase() === activeTab.trim().toLowerCase();
   });
   
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn text-left">
       
-      {/* Naya Component 1 */}
+      {/* Post Creator Box */}
       <PostComposer onPostSuccess={(newPost) => setPosts([newPost, ...posts])} />
 
-      {/* Tabs */}
+      {/* Dynamic Tabs Panel */}
       <div className="flex bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto hide-scrollbar">
         {tabs.map(tab => (
           <button 
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 min-w-max px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
-              activeTab === tab ? 'bg-blue-900 text-white shadow-sm' : 'text-gray-500 hover:bg-gray-50'
+            className={`flex-1 min-w-max px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+              activeTab === tab 
+                ? 'bg-slate-900 text-white shadow-sm' 
+                : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
             {tab}
@@ -85,17 +88,16 @@ export default function Feed() {
         ))}
       </div>
 
-      {/* Feed List */}
+      {/* Live Stream List */}
       <div className="space-y-4">
         {loading ? (
           <><SkeletonPost /><SkeletonPost /></>
         ) : filteredPosts.length === 0 ? (
-          <div className="text-center text-gray-500 py-10 bg-white rounded-2xl shadow-sm border border-gray-200">
-            No updates found. Be the first to post!
+          <div className="text-center text-gray-400 text-xs font-medium py-12 bg-white rounded-2xl shadow-sm border border-gray-200">
+            No updates found under "{activeTab}" yet. Be the first to post!
           </div>
         ) : (
           filteredPosts.map(post => (
-            // Naya Component 2
             <PostCard 
               key={post._id} 
               post={post} 

@@ -4,9 +4,7 @@ const Notification = require('../models/Notification');
 
 const createPost = async (req, res) => {
   try {
-    const { content, category, pageId } = req.body;
-    
-    // Auth middleware se aane wali user string ya object ko safely parse karne ke liye
+    const { content, category, pageId, postType } = req.body;
     const currentUserId = req.user?._id || req.user?.id || req.user;
 
     if (!content?.trim()) {
@@ -14,9 +12,12 @@ const createPost = async (req, res) => {
     }
 
     const newPost = await Post.create({
+      // Agar post page ke throw ho rahi hai, toh user ref ko structural context ke liye rakh sakte hain, 
+      // par identity check main field 'page' hi sambhalegi
       user: currentUserId.toString(),
       content,
-      category: category || 'Networking',
+      // ✨ Dono side same simple dynamic values assign ho rahi hain
+      category: postType || category || 'General',
       page: pageId || null
     });
 
@@ -189,9 +190,25 @@ const getSavedPosts = async (req, res) => {
   }
 };
 
+const getPagePosts = async (req, res) => {
+  try {
+    // URL se Page ID nikal kar query chalayi
+    const posts = await Post.find({ page: req.params.id })
+      .populate('user', 'name role jobTitle department')
+      .populate('page', 'name category')
+      .sort({ createdAt: -1 }); // Newest posts first
+
+    res.json(posts);
+  } catch (error) {
+    console.error("Get Page Posts Error:", error.message);
+    res.status(500).json({ message: 'Server Error fetching page posts' });
+  }
+};
+
 module.exports = { 
   createPost, 
   getPosts, 
+  getPagePosts, 
   likePost, 
   deletePost, 
   addComment, 

@@ -11,10 +11,14 @@ const postSchema = new mongoose.Schema({
     required: true
   },
   category: {
-    type: String,
-    enum: ['Networking', 'Job Updates', 'Study Resources', 'General', 'Official Circular', 'Urgent Update'],
-    default: 'Networking'
-  },
+  type: String,
+  enum: [
+    'Networking', 'Job Updates', 'Study Resources', 'General', 
+    'Official Circular', 'Urgent Update',
+    'Exam update', 'Study material'
+  ],
+  default: 'General'
+},
   page: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Page',
