@@ -113,23 +113,30 @@ const getPagePosts = async (req, res) => {
   }
 };
 
+// 📑 backend/controllers/pageController.js me deletePage function ko isse replace kardo:
+
 const deletePage = async (req, res) => {
   try {
-    const page = await Page.findById(req.params.id);
-    
-    if (!page) {
-      return res.status(404).json({ message: 'Page nahi mila.' });
+    const pageId = req.params.id;
+    const currentUserId = req.user?._id || req.user?.id || req.user;
+
+    const pageInstance = await Page.findById(pageId);
+    if (!pageInstance) {
+      return res.status(404).json({ message: 'Page not found' });
     }
 
-    // Check karo ki delete karne wala banda page ka owner hi hai na
-    if (String(page.owner?._id || page.owner) !== String(req.user._id || req.user)) {
-      return res.status(401).json({ message: 'Not authorized to delete this page.' });
+    // Authorization Guard: Strict owner matching chain
+    if (pageInstance.owner.toString() !== currentUserId.toString()) {
+      return res.status(401).json({ message: 'User not authorized to delete this page' });
     }
 
-    await page.deleteOne();
-    res.json({ message: 'Page successfully delete ho gaya hai.' });
+    // 🔥 CRITICAL CHANGE: Yeh hook cascade trigger ko force karega database clean karne ke liye
+    await pageInstance.deleteOne();
+
+    res.json({ message: 'Page and its related posts removed successfully' });
   } catch (error) {
-    res.status(500).json({ message: 'Server Error during page deletion.' });
+    console.error('Delete Page Error:', error.message);
+    res.status(500).json({ message: 'Server Error executing page wipe' });
   }
 };
 
