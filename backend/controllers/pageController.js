@@ -1,4 +1,5 @@
 const Page = require('../models/Page');
+const Post = require('../models/Post');
 
 // A. Initialize & Create Page Node
 const createPage = async (req, res) => {
@@ -113,8 +114,6 @@ const getPagePosts = async (req, res) => {
   }
 };
 
-// 📑 backend/controllers/pageController.js me deletePage function ko isse replace kardo:
-
 const deletePage = async (req, res) => {
   try {
     const pageId = req.params.id;
@@ -125,18 +124,22 @@ const deletePage = async (req, res) => {
       return res.status(404).json({ message: 'Page not found' });
     }
 
-    // Authorization Guard: Strict owner matching chain
+    // Authorization Guard: Strict owner matching check
     if (pageInstance.owner.toString() !== currentUserId.toString()) {
       return res.status(401).json({ message: 'User not authorized to delete this page' });
     }
 
-    // 🔥 CRITICAL CHANGE: Yeh hook cascade trigger ko force karega database clean karne ke liye
-    await pageInstance.deleteOne();
+    // 🔥 STEP 1: Direct Controller Level Cleanup (Direct Database Operation)
+    // Is pageId se linked jitni bhi posts hain unka clear data wipe loop background me chalao
+    await Post.deleteMany({ page: pageId });
 
-    res.json({ message: 'Page and its related posts removed successfully' });
+    // 🔥 STEP 2: Target Page Document ko remove kardo query interface se
+    await Page.findByIdAndDelete(pageId);
+
+    res.json({ message: 'Page and all its posts removed successfully! 🛑' });
   } catch (error) {
-    console.error('Delete Page Error:', error.message);
-    res.status(500).json({ message: 'Server Error executing page wipe' });
+    console.error('--- EXACT DELETE ERROR TRACE ---', error);
+    res.status(500).json({ message: 'Server Error executing page wipe', error: error.message });
   }
 };
 
