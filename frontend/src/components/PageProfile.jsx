@@ -20,7 +20,7 @@ export default function PageProfile() {
   const [adminActiveMenu, setAdminActiveMenu] = useState('Dashboard'); 
   const [memberActiveTab, setMemberActiveTab] = useState('Home'); 
   const [postFilter, setPostFilter] = useState('General'); 
-  const [selectedPostType, setSelectedPostType] = useState('General'); // 👈 State for selection dropdown
+  const [selectedPostType, setSelectedPostType] = useState('General'); 
   
   const [newPostContent, setNewPostContent] = useState('');
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
@@ -49,7 +49,10 @@ export default function PageProfile() {
       }
 
       const resPosts = await fetch(`${API_BASE_URL}/api/pages/${id}/posts`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (resPosts.ok) setPosts(await resPosts.json());
+      if (resPosts.ok) {
+        const data = await resPosts.json();
+        setPosts(data);
+      }
     } catch (err) {
       toast.error("Failed to reload data metrics.");
     } finally {
@@ -133,7 +136,7 @@ export default function PageProfile() {
       const res = await fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content: newPostContent, pageId: id, postType: selectedPostType }) // 👈 Pass postType safely
+        body: JSON.stringify({ content: newPostContent, pageId: id, postType: selectedPostType })
       });
 
       if (res.ok) {
@@ -170,6 +173,23 @@ export default function PageProfile() {
     }
   };
 
+  // 🔥 CASCADE INDIVIDUAL POST DELETE FOR ADMIN CONTROL
+  const handleInlinePostDelete = async (postId) => {
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setPosts(prev => prev.filter(p => p._id !== postId));
+        toast.success("Post removed successfully! 🗑️");
+      }
+    } catch (err) {
+      toast.error("Failed to delete resource.");
+    }
+  };
+
   if (loading || !page) {
     return (
       <div className="max-w-3xl mx-auto mt-6 px-4 pb-12 animate-pulse">
@@ -180,13 +200,13 @@ export default function PageProfile() {
   }
 
   const renderPostBox = () => (
-    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3 animate-fadeIn">
+    <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3 animate-fadeIn text-left">
       <h3 className="text-xs font-extrabold text-slate-900 uppercase tracking-wider flex items-center gap-1">📝 Broadcast Official Update</h3>
       <form onSubmit={handleCreatePost} className="space-y-3">
         <textarea
           value={newPostContent}
           onChange={(e) => setNewPostContent(e.target.value)}
-          className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm outline-none font-medium h-20 resize-none focus:ring-1 focus:ring-slate-900"
+          className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm outline-none font-medium h-20 resize-none focus:ring-1 focus:ring-slate-900 text-slate-900"
           placeholder={`What's new at ${page.name}? Share announcements, schedules...`}
         />
         <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -217,9 +237,6 @@ export default function PageProfile() {
   return (
     <div className="w-full mx-auto mt-2 pb-12 animate-fadeIn text-left">
       
-      {/* =========================================================================
-          🏛️ VIEW TYPE A: ADMIN WORKSPACE PANEL ACTIVE (Full Bleed View)
-          ========================================================================= */}
       {renderAdminMode ? (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
           <div className="md:col-span-3 space-y-4">
@@ -260,22 +277,22 @@ export default function PageProfile() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-left">
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100"><span className="block text-xl font-black text-slate-900">24</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Search appearances</span></div>
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100"><span className="block text-xl font-black text-slate-900">{page.followers?.length || 0}</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">New Followers</span></div>
-                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100"><span className="block text-xl font-black text-slate-900">{posts.length * 4}</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Post impressions</span></div>
+                    <div className="p-3 bg-slate-50 rounded-xl border border-slate-100"><span className="block text-xl font-black text-slate-900">{posts ? posts.length * 4 : 0}</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Post impressions</span></div>
                     <div className="p-3 bg-slate-50 rounded-xl border border-slate-100"><span className="block text-xl font-black text-slate-900">12</span><span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Page visitors</span></div>
                   </div>
                 </div>
                 {renderPostBox()}
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-50 pb-2">Recent Stream Notices</h3>
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 text-left">
+                  <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Recent Stream Notices</h3>
                   <div className="space-y-3">
-                    {posts.length > 0 ? (
+                    {posts && posts.length > 0 ? (
                       posts.slice(0, 3).map(post => (
                         <div key={post._id} className="border border-slate-100 p-4 bg-slate-50/60 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-1">
                           <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-1">
                             <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider">{post.category || 'General'}</span>
                             <span>📅 {new Date(post.createdAt).toLocaleDateString()}</span>
                           </div>
-                          <p className="whitespace-pre-wrap">{post.content}</p>
+                          <p className="whitespace-pre-wrap text-slate-900">{post.content}</p>
                         </div>
                       ))
                     ) : <p className="text-xs text-slate-400 font-medium italic">No updates live.</p>}
@@ -284,24 +301,34 @@ export default function PageProfile() {
               </div>
             )}
 
+            {/* 🔥 PREMIUM DESIGN SYNC INSIDE ADMIN INTERFACE */}
             {adminActiveMenu === 'Page posts' && (
               <div className="space-y-4 animate-fadeIn">
                 {renderPostBox()}
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">All Stream Releases ({posts.length})</h3>
+                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 text-left">
+                  <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">All Stream Releases ({posts ? posts.length : 0})</h3>
                   <div className="space-y-3">
-                    {posts.length > 0 ? (
+                    {posts && posts.length > 0 ? (
                       posts.map(p => (
-                        <div key={p._id} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-1.5">
+                        <div key={p._id} className="p-4 bg-slate-50 border border-slate-150 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-2 relative group transition hover:bg-slate-100/50">
                           <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
                             <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider">{p.category || 'General'}</span>
-                            <span>📅 {new Date(p.createdAt).toLocaleDateString()}</span>
+                            <div className="flex items-center gap-3">
+                              <span>📅 {new Date(p.createdAt).toLocaleDateString()}</span>
+                              <button 
+                                onClick={() => handleInlinePostDelete(p._id)}
+                                className="text-slate-400 hover:text-red-500 transition-all rounded p-0.5"
+                                title="Delete Notice"
+                              >
+                                🗑️
+                              </button>
+                            </div>
                           </div>
-                          <p className="whitespace-pre-wrap text-slate-900 font-medium">{p.content}</p>
+                          <p className="whitespace-pre-wrap text-slate-900 font-medium leading-relaxed">{p.content}</p>
                         </div>
                       ))
                     ) : (
-                      <div className="text-center py-6 text-slate-400 text-xs font-medium">No posts published under this feed management yet.</div>
+                      <div className="text-center py-10 text-slate-400 text-xs font-semibold">No posts published under this feed management yet.</div>
                     )}
                   </div>
                 </div>
@@ -364,7 +391,6 @@ export default function PageProfile() {
             👤 VIEW TYPE B: REVISED COMPREHENSIVE MEMBER VIEW WITH SUB-TABS INTERNALS
            ========================================================================= */
         <div className="max-w-3xl mx-auto space-y-4 animate-fadeIn">
-          {/* Cover Hero Block */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden relative">
             <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div> 
             <div className="px-6 pb-6 relative">
@@ -406,37 +432,37 @@ export default function PageProfile() {
           </div>
 
           {memberActiveTab === 'Home' && (
-          <div className="space-y-3 animate-fadeIn text-left">
-            {posts && posts.length > 0 ? (
-              posts.map(post => (
-                <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
-                      {getInitials(page.name)}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">
-                        <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-extrabold mr-1 uppercase tracking-wide border border-slate-200">
-                          {post.category || 'General'}
+            <div className="space-y-3 animate-fadeIn text-left">
+              {posts && posts.length > 0 ? (
+                posts.map(post => (
+                  <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
+                        {getInitials(page.name)}
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">
+                          <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-extrabold mr-1 uppercase tracking-wide border border-slate-200">
+                            {post.category || 'General'}
+                          </span>
+                          • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
                         </span>
-                        • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
-                      </span>
+                      </div>
                     </div>
+                    <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
                   </div>
-                  <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                ))
+              ) : (
+                <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
+                  No live broadcast updates shared on this brand profile yet.
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
-                No live broadcast updates shared on this brand profile yet.
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
           {memberActiveTab === 'About' && (
-            <div className="space-y-4 animate-fadeIn">
+            <div className="space-y-4 animate-fadeIn text-left">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                 <h2 className="text-xs font-bold text-slate-400 tracking-widest uppercase mb-2">Company Profile</h2>
                 <p className="text-sm text-slate-800 font-medium leading-relaxed whitespace-pre-wrap">{page.about || 'No detailed background records configured yet.'}</p>
@@ -458,51 +484,48 @@ export default function PageProfile() {
           )}
 
           {memberActiveTab === 'Posts' && (
-        <div className="space-y-4 animate-fadeIn text-left">
-          {/* Clean Category Filter Tabs */}
-          <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
-            {['General', 'Exam update', 'Study material'].map(filter => (
-              <button 
-                key={filter} 
-                onClick={() => setPostFilter(filter)} 
-                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${postFilter === filter ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-    
-          {/* Live Rendering Post Grid */}
-          <div className="space-y-3">
-            {posts && posts.filter(post => {
-              // Safe check: category match loop engine bypass execution
-              const targetCategory = post.category || 'General';
-              return targetCategory.trim().toLowerCase() === postFilter.trim().toLowerCase();
-            }).length > 0 ? (
-              posts.filter(post => (post.category || 'General').trim().toLowerCase() === postFilter.trim().toLowerCase()).map(post => (
-                <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
-                      {getInitials(page.name)}
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
-                      <span className="text-[9px] font-bold text-slate-400 uppercase">
-                        {page.category} • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
-                No updates shared under "{postFilter}" tags yet.
+            <div className="space-y-4 animate-fadeIn text-left">
+              <div className="flex gap-2 bg-slate-100 p-1 rounded-xl w-fit border border-slate-200">
+                {['General', 'Exam update', 'Study material'].map(filter => (
+                  <button 
+                    key={filter} 
+                    onClick={() => setPostFilter(filter)} 
+                    className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${postFilter === filter ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    {filter}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
-        </div>
-      )}
+        
+              <div className="space-y-3">
+                {posts && posts.filter(post => {
+                  const targetCategory = post.category || 'General';
+                  return targetCategory.trim().toLowerCase() === postFilter.trim().toLowerCase();
+                }).length > 0 ? (
+                  posts.filter(post => (post.category || 'General').trim().toLowerCase() === postFilter.trim().toLowerCase()).map(post => (
+                    <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
+                          {getInitials(page.name)}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">
+                            {page.category} • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
+                    No updates shared under "{postFilter}" tags yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {memberActiveTab === 'Jobs' && isInstitute && (
             <div className="bg-white rounded-2xl p-6 border border-gray-200 text-center py-12 animate-fadeIn shadow-sm">
