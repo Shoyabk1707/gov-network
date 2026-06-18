@@ -33,33 +33,32 @@ export default function Profile() {
   };
 
   const fetchProfileData = async () => {
-  try {
-    const resProfile = await fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
-    if (resProfile.ok) {
-      const data = await resProfile.json();
-      setUser(data);
-      setFormData({
-        name: data.name || '', tagline: data.tagline || '', city: data.city || '', 
-        state: data.state || '', bio: data.bio || '', 
-        department: data.department || '', jobTitle: data.jobTitle || '',
-        targetExams: data.targetExams?.join(', ') || ''
-      });
+    try {
+      const resProfile = await fetch(`${API_BASE_URL}/api/auth/me`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (resProfile.ok) {
+        const data = await resProfile.json();
+        setUser(data);
+        setFormData({
+          name: data.name || '', tagline: data.tagline || '', city: data.city || '', 
+          state: data.state || '', bio: data.bio || '', 
+          department: data.department || '', jobTitle: data.jobTitle || '',
+          targetExams: data.targetExams?.join(', ') || ''
+        });
 
-      const resPosts = await fetch(`${API_BASE_URL}/api/posts`, { headers: { 'Authorization': `Bearer ${token}` } });
-      if (resPosts.ok) {
-        const allPosts = await resPosts.json();
-        
-        // 🔥 Strict Check applied here
-        setUserPosts(allPosts.filter(post => 
-          String(post.user?._id || post.user) === String(data._id) && 
-          (!post.page || post.page === null || post.page === undefined)
-        ));
+        const resPosts = await fetch(`${API_BASE_URL}/api/posts`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (resPosts.ok) {
+          const allPosts = await resPosts.json();
+          
+          setUserPosts(allPosts.filter(post => 
+            String(post.user?._id || post.user) === String(data._id) && 
+            (!post.page || post.page === null || post.page === undefined)
+          ));
+        }
       }
+    } catch (err) {
+      toast.error("Failed to fetch profile data!");
     }
-  } catch (err) {
-    toast.error("Failed to fetch profile data!");
-  }
-};
+  };
 
   const fetchSavedPosts = async () => {
     try {
@@ -119,7 +118,6 @@ export default function Profile() {
     }
   };
 
-  // 🔥 CASCADE DELETE ENGINE: Splices state context synchronously
   const handleDelete = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this notice?")) return;
     try {
@@ -139,7 +137,6 @@ export default function Profile() {
     }
   };
 
-  // 🔥 CORE PIPELINE INTERACTION LOGIC SYNCHRONIZATION (LIKE)
   const handleLike = async (postId) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
@@ -155,7 +152,6 @@ export default function Profile() {
     }
   };
 
-  // 🔥 REAL-TIME UPDATE FOR COMMENT LOOPS
   const handleUpdateComments = (id, newComments) => {
     const updateLoop = prev => prev.map(p => p._id === id ? { ...p, comments: newComments } : p);
     setUserPosts(updateLoop);
@@ -177,24 +173,24 @@ export default function Profile() {
   return (
     <div className="max-w-3xl mx-auto mt-4 space-y-4 pb-12 relative px-4 md:px-0 text-left">
       
-      {/* 🛠... PROFILE INTRO EDIT MODAL ... (Kept exactly same as your layout) */}
+      {/* 🛠... PROFILE INTRO EDIT MODAL ... */}
       {showEditModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100 max-h-[90vh] overflow-y-auto hide-scrollbar">
             <h2 className="text-xl font-bold mb-4 text-slate-900">Edit Professional Info</h2>
             <form onSubmit={(e) => { e.preventDefault(); saveToDatabase(formData); }} className="space-y-4">
-              <input type="text" name="name" value={formData.name} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-slate-900 outline-none transition text-sm font-medium" placeholder="Full Name" required />
-              <input type="text" name="tagline" value={formData.tagline} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-slate-900 outline-none transition text-sm font-medium" placeholder="Headline Tagline" />
+              <input type="text" name="name" value={formData.name || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-slate-900 outline-none transition text-sm font-medium" placeholder="Full Name" required />
+              <input type="text" name="tagline" value={formData.tagline || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-slate-900 outline-none transition text-sm font-medium" placeholder="Headline Tagline" />
               <div className="flex gap-4">
-                <input type="text" name="jobTitle" value={formData.jobTitle} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Designation" />
-                <input type="text" name="department" value={formData.department} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Department / Organization" />
+                <input type="text" name="jobTitle" value={formData.jobTitle || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Designation" />
+                <input type="text" name="department" value={formData.department || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Department / Organization" />
               </div>
               <div className="flex gap-4">
-                <input type="text" name="city" value={formData.city} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="City" />
-                <input type="text" name="state" value={formData.state} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="State" />
+                <input type="text" name="city" value={formData.city || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="City" />
+                <input type="text" name="state" value={formData.state || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="State" />
               </div>
-              <textarea name="bio" value={formData.bio} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none text-sm font-medium" placeholder="Write a summary..."></textarea>
-              <input type="text" name="targetExams" value={formData.targetExams} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Exams Tracking/Cleared" />
+              <textarea name="bio" value={formData.bio || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none text-sm font-medium" placeholder="Write a summary..."></textarea>
+              <input type="text" name="targetExams" value={formData.targetExams || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Exams Tracking/Cleared" />
               <div className="flex justify-end gap-3 mt-4">
                 <button type="button" onClick={() => setShowEditModal(false)} className="px-5 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl transition text-sm">Cancel</button>
                 <button type="submit" className="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-sm transition text-sm">Save Changes</button>
@@ -204,7 +200,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* 🛠... WORKSPACE / EDUCATION MODALS ... (Kept exactly same) */}
+      {/* 🛠... WORKSPACE EXPERIENCES MODAL ... */}
       {showExpModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100">
@@ -229,13 +225,14 @@ export default function Profile() {
         </div>
       )}
 
+      {/* 🛠... EDUCATION METRICS MODAL ... */}
       {showEduModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100">
             <h2 className="text-xl font-bold mb-4 text-slate-900">Add Academic Background</h2>
             <form onSubmit={(e) => { e.preventDefault(); saveToDatabase({ education: [...(user.education || []), eduData] }); }} className="space-y-4">
-              <input type="text" name="school" value={eduData.school} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="School / College" required />
-              <input type="text" name="degree" value={eduData.degree} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Degree" required />
+              <input type="text" name="school" value={eduData.school} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="School / College / University" required />
+              <input type="text" name="degree" value={eduData.degree} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Degree (e.g., B.Tech, MA)" required />
               <input type="text" name="fieldOfStudy" value={eduData.fieldOfStudy} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Field of Study" />
               <div className="flex gap-4">
                 <input type="text" name="startYear" value={eduData.startYear} onChange={handleEduChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Start Year" />
@@ -250,7 +247,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Profile Info Card Container */}
+      {/* Profile Info Header Container */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn">
         <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div> 
         <div className="px-6 pb-6 relative">
@@ -353,7 +350,7 @@ export default function Profile() {
             </div>
           )}
 
-          {/* Experience and Education UI loops (kept static exactly as previous layout) */}
+          {/* Experience Timeline Card */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Experience History</h2>
@@ -365,13 +362,34 @@ export default function Profile() {
                   <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0">
                     <div className="absolute w-2.5 h-2.5 bg-slate-900 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
                     <h3 className="font-bold text-slate-900 text-sm">{exp.title}</h3>
-                    <p className="text-sm text-slate-700 font-medium mt-0.5">{exp.company}</p>
+                    <p className="text-sm text-slate-700 font-medium mt-0.5">{exp.company} {exp.location ? `• ${exp.location}` : ''}</p>
                     <p className="text-xs text-slate-500 mt-1">{exp.startDate} - {exp.current ? 'Present' : exp.endDate}</p>
                   </div>
                 ))
               ) : <p className="text-sm text-slate-400 italic">No workspace records.</p>}
             </div>
           </div>
+
+          {/* 🔥 FIXED SECTION: Injected the missing Education Credentials timeline */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex justify-between items-center mb-5">
+              <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Education Credentials</h2>
+              <button onClick={() => setShowEduModal(true)} className="text-slate-900 text-sm font-bold bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">+ Add</button>
+            </div>
+            <div className="space-y-5">
+              {user.education?.length > 0 ? (
+                user.education.map((edu, idx) => (
+                  <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0">
+                    <div className="absolute w-2.5 h-2.5 bg-slate-500 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
+                    <h3 className="font-bold text-slate-900 text-sm">{edu.school}</h3>
+                    <p className="text-sm text-slate-700 font-medium mt-0.5">{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</p>
+                    <p className="text-xs text-slate-500 mt-1">{edu.startYear} - {edu.endYear}</p>
+                  </div>
+                ))
+              ) : <p className="text-sm text-slate-400 italic">No academic timelines added yet.</p>}
+            </div>
+          </div>
+
         </div>
       )}
 
