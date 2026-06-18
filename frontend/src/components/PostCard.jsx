@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import toast from 'react-hot-toast';
@@ -7,10 +7,13 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  
+  // 🔥 HYBRID PERSISTENT STATE: Local state sync jo localStorage se state check karegi taaki refresh resistant rahe
+  const [hasSaved, setHasSaved] = useState(false);
+  
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
 
-  // Parse logged-in user profile metrics cleanly
   let currentUserId = null;
   try {
     const tokenPayload = token ? JSON.parse(atob(token.split('.')[1])) : null;
@@ -20,24 +23,38 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   }
 
   const isPagePost = post.page !== null && post.page !== undefined;
-  
-  // Author data mapping engines
   const authorName = isPagePost ? post.page.name : post.user?.name || "User Node";
   const authorSubtext = isPagePost 
     ? `${post.page.category === 'Coaching Institute' ? 'Institute Update' : 'Content Creator'}`
     : post.user?.jobTitle || "Member";
 
-  // Dynamic initialization generator
   const getAvatarInitials = (nameString) => {
     if (!nameString) return "KB";
     const clean = nameString.trim().split(' ');
     return clean.length >= 2 ? (clean[0][0] + clean[1][0]).toUpperCase() : clean[0][0].toUpperCase();
   };
 
-  // 🔥 AUTHORIZATION SECURITY GATE: Validates owner status chain explicitly
-  const isPostAuthor = !isPagePost && post.user && String(post.user._id || post.user) === String(currentUserId);
-  const isPageManager = isPagePost && post.page.owner && String(post.page.owner._id || post.page.owner) === String(currentUserId);
+  const postAuthorId = post.user?._id || post.user;
+  const pageManagerId = post.page?.owner?._id || post.page?.owner;
+
+  const isPostAuthor = !isPagePost && postAuthorId && String(postAuthorId) === String(currentUserId);
+  const isPageManager = isPagePost && pageManagerId && String(pageManagerId) === String(currentUserId);
   const canDelete = isPostAuthor || isPageManager;
+
+  // Likes check directly using array length
+  const hasLiked = post.likes && post.likes.some(id => String(id) === String(currentUserId));
+
+  // 🔥 EFFECT TO LOAD SAVED INITIAL STATE (Refresh resistant bypass without backend savedBy schema)
+  useEffect(() => {
+    // Agar hum profile ke saved tab par hain, toh automatically true rakho
+    if (window.location.pathname.includes('profile')) {
+      setHasSaved(true);
+    } else {
+      // Feed page ke liye browser storage se lookup kar lo key sync
+      const savedRegistry = JSON.parse(localStorage.getItem(`saved_node_${currentUserId}`)) || {};
+      setHasSaved(!!savedRegistry[post._id]);
+    }
+  }, [post._id, currentUserId]);
 
   const handleShare = async (e) => {
     e.stopPropagation();
@@ -46,9 +63,9 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
       await navigator.clipboard.writeText(postUrl);
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-      toast.success("Link copied to clipboard! 🔗");
+      toast.success("Link copied! 🔗");
     } catch (err) {
-      toast.error("Failed to copy path link.");
+      toast.error("Failed to copy link.");
     }
   };
 
@@ -60,9 +77,32 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
-      res.ok ? toast.success(data.message) : toast.error(data.message);
+      
+      if (res.ok) {
+        // Update browser storage registry context
+        const savedRegistry = JSON.parse(localStorage.getItem(`saved_node_${currentUserId}`)) || {};
+        const nextState = !hasSaved;
+        
+        if (nextState) {
+          savedRegistry[post._id] = true;
+          toast.success("Post saved successfully! 🔖");
+        } else {
+          delete savedRegistry[post._id];
+          toast.success("Post removed from saved bookmarks.");
+        }
+        
+        localStorage.setItem(`saved_node_${currentUserId}`, JSON.stringify(savedRegistry));
+        setHasSaved(nextState);
+
+        // 🔥 DYNAMIC PARENT TRIGGER: Yeh line profile page list se post ko bina refresh instantly gayab kar degi
+        if (typeof onLike === 'function') {
+          onLike(post._id); // Re-fetch query call safely mapping context triggers
+        }
+      } else {
+        toast.error(data.message);
+      }
     } catch (err) {
-      toast.error("Error processing notice save loop.");
+      toast.error("Error processing save request.");
     }
   };
 
@@ -79,7 +119,7 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         const updatedComments = await res.json();
         onUpdateComments(post._id, updatedComments);
         setCommentText('');
-        toast.success("Response posted! 💬");
+        toast.success("Comment added! 💬");
       }
     } catch (err) {
       toast.error("Comment submission failed.");
@@ -89,126 +129,126 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   return (
     <div 
       onClick={() => navigate(`/post/${post._id}`)}
-      className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer text-left space-y-4"
+      className="bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer text-left overflow-hidden"
     >
-      {/* HEADER CONTROLS VIEW */}
-      <div className="flex justify-between items-start gap-4">
-        <div className="flex items-center gap-3">
-          {/* Dynamic Alphabetic Letter Block */}
-          <div className={`w-11 h-11 rounded-xl flex items-center justify-center font-black text-sm tracking-wide shrink-0 ${
-            isPagePost ? 'bg-slate-950 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'
-          }`}>
-            {getAvatarInitials(authorName)}
+      <div className="p-5 space-y-3">
+        <div className="flex justify-between items-start gap-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shrink-0 ${
+              isPagePost ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'
+            }`}>
+              {getAvatarInitials(authorName)}
+            </div>
+            
+            <div>
+              <h4 className="font-bold text-slate-900 text-[15px] leading-tight tracking-tight flex items-center gap-1.5">
+                {authorName}
+                {post.user?.role === 'official' && !isPagePost && (
+                  <span className="bg-slate-900 text-white text-[9px] px-1.5 py-0.5 rounded-full font-extrabold uppercase tracking-wider scale-90">Official</span>
+                )}
+              </h4>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">
+                {authorSubtext}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recently'}
+                <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                <span className="text-slate-800 font-bold">{post.category || 'General'}</span>
+              </p>
+            </div>
           </div>
-          
-          <div>
-            <h4 className="font-extrabold text-slate-900 text-sm leading-tight tracking-tight flex items-center gap-1.5">
-              {authorName}
-              {post.user?.role === 'official' && !isPagePost && (
-                <span className="bg-slate-900 text-white text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider scale-90">Official</span>
-              )}
-            </h4>
-            <p className="text-[11px] text-slate-400 font-bold mt-0.5 tracking-wide">
-              {authorSubtext} • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : 'Recently'}
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-          {/* Badge indicator on matching stream tag */}
-          <span className="text-[9px] bg-slate-100 text-slate-700 border border-slate-200 px-2.5 py-0.5 rounded-md font-extrabold uppercase tracking-wider">
-            {post.category || 'General'}
-          </span>
-          
-          {/* 🔥 DYNAMIC OWNER PROTECTION CHECK TRIGGER */}
-          {canDelete && (
-            <button 
-              onClick={(e) => { e.stopPropagation(); onDelete(post._id); }} 
-              className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all"
-              title="Delete Post"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
-          )}
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {canDelete && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onDelete(post._id); }} 
+                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all"
+                title="Delete Post"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            )}
+          </div>
         </div>
+        
+        <p className="text-slate-800 text-[15px] font-normal whitespace-pre-wrap leading-relaxed pt-0.5">
+          {post.content}
+        </p>
       </div>
       
-      {/* MIDDLE CONTAINER SLOTS FOR CONTENT INFRASTRUCTURE */}
-      <p className="text-slate-800 text-[14px] font-medium whitespace-pre-wrap leading-relaxed tracking-normal pt-0.5 px-0.5">
-        {post.content}
-      </p>
-      
-      {/* FOOTER CORE ACTION BAR MECHANICS */}
       <div 
-        className="pt-2 border-t border-slate-100 flex items-center justify-between" 
+        className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50/50 text-slate-500 font-medium text-sm" 
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 sm:gap-4">
-          <button 
-            onClick={() => onLike(post._id)} 
-            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 10h4.757a2 2 0 011.708 3.033l-3.668 6.115A2 2 0 0115.086 20H9.172a2 2 0 01-1.664-.89l-3.333-5A2 2 0 015.84 11H10V4a1 1 0 011-1h2a1 1 0 011 1v6z" />
-            </svg>
-            <span>{post.likes?.length || 0}</span>
-          </button>
-
-          <button 
-            onClick={() => setShowComments(!showComments)} 
-            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12Custom c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </svg>
-            <span>{post.comments?.length || 0}</span>
-          </button>
-
-          <button 
-            onClick={handleShare} 
-            className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            <span>{isCopied ? "Copied" : "Share"}</span>
-          </button>
-        </div>
+        <button 
+          onClick={() => onLike(post._id)} 
+          className={`flex items-center gap-1.5 transition-colors duration-200 ${
+            hasLiked ? 'text-red-500 font-bold' : 'hover:text-red-500 text-slate-500'
+          }`}
+        >
+          <svg className="w-5 h-5" fill={hasLiked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+          </svg>
+          <span>{post.likes?.length || 0}</span>
+        </button>
 
         <button 
-          onClick={handleSave} 
-          className="flex items-center text-xs font-bold text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-3 py-1.5 rounded-xl transition gap-1.5 border border-slate-100"
+          onClick={() => setShowComments(!showComments)} 
+          className="flex items-center gap-1.5 hover:text-blue-500 transition-colors duration-200"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
           </svg>
-          <span>Save</span>
+          <span>{post.comments?.length || 0}</span>
         </button>
+
+        <button 
+          onClick={handleShare} 
+          className="flex items-center gap-1.5 hover:text-blue-500 transition-colors duration-200"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"></path>
+          </svg>
+          <span>{isCopied ? "Copied" : "Share"}</span>
+        </button>
+
+        {!canDelete && (
+          <button 
+            onClick={handleSave} 
+            className={`flex items-center gap-1.5 transition-colors duration-200 ${
+              hasSaved ? 'text-blue-600 font-bold' : 'hover:text-blue-500 text-slate-500'
+            }`}
+          >
+            <svg className="w-5 h-5" fill={hasSaved ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+            </svg>
+            <span>{hasSaved ? "Saved" : "Save"}</span>
+          </button>
+        )}
       </div>
 
-      {/* COMMENTS ENGINE INJECTION LAYOUT */}
       {showComments && (
-        <div className="mt-3 pt-3 border-t border-slate-100 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 border-t border-slate-100 bg-slate-50/30 space-y-3" onClick={(e) => e.stopPropagation()}>
           <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
             {post.comments?.map((comment) => (
               <div key={comment._id} className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-left">
-                <span className="font-extrabold text-slate-900 text-[11px] block">{comment.user?.name || "User Node"}</span>
-                <p className="text-slate-700 text-xs mt-0.5 font-medium whitespace-pre-wrap">{comment.text}</p>
+                <span className="font-bold text-slate-900 text-xs block">{comment.user?.name || "User"}</span>
+                <p className="text-slate-700 text-xs mt-0.5 whitespace-pre-wrap font-medium">{comment.text}</p>
               </div>
             ))}
           </div>
           <form onSubmit={handleCommentSubmit} className="flex items-center gap-2 mt-2">
             <input 
               type="text" 
-              placeholder="Add an official response comment..." 
+              placeholder="Add a comment..." 
               value={commentText} 
               onChange={(e) => setCommentText(e.target.value)}
-              className="flex-1 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-slate-900 focus:bg-white transition-all font-medium"
+              className="flex-1 bg-white border border-slate-200 px-4 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-slate-900 transition-all font-medium"
               required 
             />
-            <button type="submit" className="text-slate-950 font-black text-xs px-3 hover:text-slate-700 transition">Post</button>
+            <button type="submit" className="text-slate-950 font-bold text-xs px-3 hover:text-slate-700 transition">Post</button>
           </form>
         </div>
       )}

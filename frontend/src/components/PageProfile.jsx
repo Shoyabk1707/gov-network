@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import SkeletonPost from './SkeletonPost';
 import toast from 'react-hot-toast';
+// 🔥 GLOBAL PREMIUM SYNC: Connected the universal card architecture element
+import PostCard from './PostCard';
 
 export default function PageProfile() {
   const { id } = useParams();
@@ -136,7 +138,7 @@ export default function PageProfile() {
       const res = await fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content: newPostContent, pageId: id, postType: selectedPostType })
+        body: JSON.stringify({ content: newPostContent, pageId: id, category: selectedPostType })
       });
 
       if (res.ok) {
@@ -173,7 +175,7 @@ export default function PageProfile() {
     }
   };
 
-  // 🔥 CASCADE INDIVIDUAL POST DELETE FOR ADMIN CONTROL
+  // 🔥 INTERACTION LOOPS HANDLERS FOR BRAND PIPELINES
   const handleInlinePostDelete = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
     try {
@@ -190,9 +192,25 @@ export default function PageProfile() {
     }
   };
 
+  const handleLike = async (postId) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) fetchPageDetails();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleUpdateComments = (id, newComments) => {
+    setPosts(prev => prev.map(p => p._id === id ? { ...p, comments: newComments } : p));
+  };
+
   if (loading || !page) {
     return (
-      <div className="max-w-3xl mx-auto mt-6 px-4 pb-12 animate-pulse">
+      <div className="max-w-3xl mx-auto mt-6 px-4 pb-12 animate-pulse text-left">
         <div className="h-32 bg-slate-200 rounded-2xl mb-6"></div>
         <SkeletonPost />
       </div>
@@ -284,16 +302,16 @@ export default function PageProfile() {
                 {renderPostBox()}
                 <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 text-left">
                   <h3 className="text-xs font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">Recent Stream Notices</h3>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {posts && posts.length > 0 ? (
                       posts.slice(0, 3).map(post => (
-                        <div key={post._id} className="border border-slate-100 p-4 bg-slate-50/60 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-1">
-                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold mb-1">
-                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider">{post.category || 'General'}</span>
-                            <span>📅 {new Date(post.createdAt).toLocaleDateString()}</span>
-                          </div>
-                          <p className="whitespace-pre-wrap text-slate-900">{post.content}</p>
-                        </div>
+                        <PostCard 
+                          key={post._id}
+                          post={{...post, page: page}}
+                          onDelete={handleInlinePostDelete}
+                          onLike={handleLike}
+                          onUpdateComments={handleUpdateComments}
+                        />
                       ))
                     ) : <p className="text-xs text-slate-400 font-medium italic">No updates live.</p>}
                   </div>
@@ -301,31 +319,21 @@ export default function PageProfile() {
               </div>
             )}
 
-            {/* 🔥 PREMIUM DESIGN SYNC INSIDE ADMIN INTERFACE */}
             {adminActiveMenu === 'Page posts' && (
               <div className="space-y-4 animate-fadeIn">
                 {renderPostBox()}
                 <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-4 text-left">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">All Stream Releases ({posts ? posts.length : 0})</h3>
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {posts && posts.length > 0 ? (
                       posts.map(p => (
-                        <div key={p._id} className="p-4 bg-slate-50 border border-slate-150 rounded-2xl text-sm font-medium text-slate-800 flex flex-col gap-2 relative group transition hover:bg-slate-100/50">
-                          <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
-                            <span className="bg-slate-200 text-slate-700 px-2 py-0.5 rounded uppercase tracking-wider">{p.category || 'General'}</span>
-                            <div className="flex items-center gap-3">
-                              <span>📅 {new Date(p.createdAt).toLocaleDateString()}</span>
-                              <button 
-                                onClick={() => handleInlinePostDelete(p._id)}
-                                className="text-slate-400 hover:text-red-500 transition-all rounded p-0.5"
-                                title="Delete Notice"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
-                          <p className="whitespace-pre-wrap text-slate-900 font-medium leading-relaxed">{p.content}</p>
-                        </div>
+                        <PostCard 
+                          key={p._id}
+                          post={{...p, page: page}}
+                          onDelete={handleInlinePostDelete}
+                          onLike={handleLike}
+                          onUpdateComments={handleUpdateComments}
+                        />
                       ))
                     ) : (
                       <div className="text-center py-10 text-slate-400 text-xs font-semibold">No posts published under this feed management yet.</div>
@@ -432,29 +440,19 @@ export default function PageProfile() {
           </div>
 
           {memberActiveTab === 'Home' && (
-            <div className="space-y-3 animate-fadeIn text-left">
+            <div className="space-y-4 animate-fadeIn text-left">
               {posts && posts.length > 0 ? (
                 posts.map(post => (
-                  <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
-                        {getInitials(page.name)}
-                      </div>
-                      <div>
-                        <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
-                        <span className="text-[9px] font-bold text-slate-400 uppercase">
-                          <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-extrabold mr-1 uppercase tracking-wide border border-slate-200">
-                            {post.category || 'General'}
-                          </span>
-                          • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                  </div>
+                  <PostCard 
+                    key={post._id}
+                    post={{...post, page: page}}
+                    onDelete={handleInlinePostDelete}
+                    onLike={handleLike}
+                    onUpdateComments={handleUpdateComments}
+                  />
                 ))
               ) : (
-                <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
+                <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 text-slate-400 font-medium text-xs">
                   No live broadcast updates shared on this brand profile yet.
                 </div>
               )}
@@ -497,26 +495,19 @@ export default function PageProfile() {
                 ))}
               </div>
         
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {posts && posts.filter(post => {
                   const targetCategory = post.category || 'General';
                   return targetCategory.trim().toLowerCase() === postFilter.trim().toLowerCase();
                 }).length > 0 ? (
                   posts.filter(post => (post.category || 'General').trim().toLowerCase() === postFilter.trim().toLowerCase()).map(post => (
-                    <div key={post._id} className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3 flex flex-col">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center text-sm uppercase">
-                          {getInitials(page.name)}
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-slate-900 text-sm">{page.name}</h4>
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">
-                            {page.category} • {post.createdAt ? new Date(post.createdAt).toLocaleDateString() : '11/06/2026'}
-                          </span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-slate-800 font-medium whitespace-pre-wrap leading-relaxed">{post.content}</p>
-                    </div>
+                    <PostCard 
+                      key={post._id}
+                      post={{...post, page: page}}
+                      onDelete={handleInlinePostDelete}
+                      onLike={handleLike}
+                      onUpdateComments={handleUpdateComments}
+                    />
                   ))
                 ) : (
                   <div className="text-center py-10 bg-white rounded-2xl border border-slate-200 text-slate-400 font-medium text-xs">
