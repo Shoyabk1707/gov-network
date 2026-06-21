@@ -46,6 +46,31 @@ export default function UserProfile({ userId, onBack }) {
     if (userId) fetchCreatorData();
   }, [userId, token]);
 
+  // 💬 CHAT INITIATION TRIGGER ENGINE
+  const handleStartChat = async () => {
+  try {
+    // Strict matching with backend configuration map
+    const res = await fetch(`${API_BASE_URL}/api/chat/start`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ recipientId: userId })
+    });
+
+    if (res.ok) {
+      toast.success("Opening secure stream... 💬");
+      navigate('/messages'); 
+    } else {
+      const errData = await res.json();
+      toast.error(errData.message || "Failed to initiate chat bridge.");
+    }
+  } catch (err) {
+    toast.error("Network sync failure.");
+  }
+};
+
   // 🔥 INTERACTION ENGINE PIPELINES SYNCHRONIZATION
   const handleLike = async (postId) => {
     try {
@@ -115,9 +140,18 @@ export default function UserProfile({ userId, onBack }) {
         
         <div className="px-6 pb-6 relative">
           
-          <div className="absolute top-4 right-6 flex gap-2 z-20">
-            <button className="px-5 py-1.5 bg-slate-900 text-white rounded-lg text-sm font-bold hover:bg-slate-800 transition shadow-sm">
+          {/* ACTION BUTTONS GRID SYSTEM */}
+          <div className="absolute top-4 right-6 flex items-center gap-2 z-20">
+            <button className="px-5 py-1.5 bg-slate-100 text-slate-800 border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-200 transition shadow-sm">
               Follow
+            </button>
+
+            {/* ✨ INJECTED CHAT INTEGRATION BUTTON */}
+            <button 
+              onClick={handleStartChat}
+              className="px-4 py-1.5 bg-slate-900 text-white border border-slate-900 rounded-lg text-sm font-bold hover:bg-slate-800 transition shadow-sm flex items-center gap-1.5"
+            >
+              💬 Message
             </button>
             
             {profile.verifiedAsOfficial && (
@@ -252,27 +286,26 @@ export default function UserProfile({ userId, onBack }) {
 
       {/* 🔥 REFACTORED ACTIVITY TAB */}
       {activeTab === 'Activity' && (
-  <div className="space-y-4 animate-fadeIn">
-    {posts && posts.filter(post => !post.page || post.page === null || post.page === undefined).length > 0 ? (
-      posts
-        // 🔥 STRIKE FILTER: Sirf wahi posts render karo jisme page link na ho
-        .filter(post => !post.page || post.page === null || post.page === undefined)
-        .map(post => (
-          <PostCard 
-            key={post._id} 
-            post={{...post, user: profile}} 
-            onDelete={handleDelete} 
-            onLike={handleLike}
-            onUpdateComments={handleUpdateComments}
-          />
-        ))
-    ) : (
-      <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm">
-        <p className="text-sm font-medium text-slate-500">No activity or broadcasts posted from this stream yet.</p>
-      </div>
-    )}
-  </div>
-)}
+        <div className="space-y-4 animate-fadeIn">
+          {posts && posts.filter(post => !post.page || post.page === null || post.page === undefined).length > 0 ? (
+            posts
+              .filter(post => !post.page || post.page === null || post.page === undefined)
+              .map(post => (
+                <PostCard 
+                  key={post._id} 
+                  post={{...post, user: profile}} 
+                  onDelete={handleDelete} 
+                  onLike={handleLike}
+                  onUpdateComments={handleUpdateComments}
+                />
+              ))
+          ) : (
+            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm">
+              <p className="text-sm font-medium text-slate-500">No activity or broadcasts posted from this stream yet.</p>
+            </div>
+          )}
+        </div>
+      )}
 
     </div>
   );

@@ -3,12 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import toast from 'react-hot-toast';
 import SkeletonPost from './SkeletonPost';
-// 🔥 REUSABLE PATH LINKAGE: Injected global premium component layout
 import PostCard from './PostCard';
 
-// ==========================================
-// 🏛️ PRIMARY USER PROFILE ROOT COMPONENT
-// ==========================================
 export default function Profile() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Routes, Route, useNavigate, Navigate, useParams } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { useLocation } from 'react-router-dom';
 
 // Components
 import Navbar from './components/Navbar'; 
@@ -19,24 +20,33 @@ import Notifications from './components/Notifications';
 import LeftSidebar from './components/LeftSidebar';
 import RightSidebar from './components/RightSidebar';
 import BottomNav from './components/BottomNav';
+import Messages from './components/Messages';
 
 const AuthenticatedLayout = ({ children, handleLogout }) => {
+  const location = useLocation();
+  const isMessagesPage = location.pathname === '/messages';
+
   return (
     <div className="min-h-screen bg-[#F4F6F8]">
       <Navbar handleLogout={handleLogout} />
       
       <main className="max-w-7xl mx-auto px-4 pt-6 pb-24 md:pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Left Sidebar: Hamesha 3 columns lega desktop par */}
         <div className="hidden md:block md:col-span-3">
           <LeftSidebar />
         </div>
 
-        <div className="col-span-1 md:col-span-6">
+        {/* Dynamic Center Panel: Chat page par ye 9 columns lega (jaise Twitter X par hota hai) */}
+        <div className={`col-span-1 ${isMessagesPage ? 'md:col-span-9' : 'md:col-span-6'}`}>
           {children}
         </div>
 
-        <div className="hidden lg:block lg:col-span-3">
-          <RightSidebar />
-        </div>
+        {/* Right Sidebar: Messages page aate hi completely hide ho jayega */}
+        {!isMessagesPage && (
+          <div className="hidden lg:block lg:col-span-3">
+            <RightSidebar />
+          </div>
+        )}
       </main>
 
       <BottomNav />
@@ -76,7 +86,8 @@ function App() {
         <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Notifications /></AuthenticatedLayout></ProtectedRoute>} />
-        
+        // 📑 App.jsx ke Routes block ke andar ye line add karo:
+        <Route path="/messages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Messages /></AuthenticatedLayout></ProtectedRoute>} />        
         {/* ✨ FIX: Render UserProfileWrapper now instead of CreatorProfileWrapper */}
         <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><UserProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
         

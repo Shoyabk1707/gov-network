@@ -2,9 +2,13 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const http = require('http'); // ✨ INJECTED: Standard HTTP module for Socket infrastructure
+const { Server } = require('socket.io'); // ✨ INJECTED: Socket.io Server class
 const connectDB = require('./config/db');
+const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
+const server = http.createServer(app); // ✨ UPDATED: Express app mapped into HTTP Server instance
 
 // Connect Database
 connectDB();
@@ -16,9 +20,7 @@ const allowedOrigins = [
   'https://gov-network-1m0wj5zq7-gov-network-s-projects.vercel.app/'
 ];
 
-
 app.use(cors({
-  // Is function se local localhost aur Vercel ke saare subdomains/preview links automatic allow ho jayenge
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     
@@ -46,12 +48,77 @@ app.use('/api/network', require('./routes/network'));
 app.use('/api/pages', require('./routes/pageRoutes'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
+app.use('/api/chat', chatRoutes);
 
 app.get('/', (req, res) => {
-  res.send('GovNetwork Backend is running!');
+  res.send('GovNetwork Backend is running with Sockets!');
 });
 
-const PORT = 5000;
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+// ==========================================
+// 🔌 REAL-TIME SOCKET.IO ENGINE CONFIGURATION
+// ==========================================
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Memory registry to track live users mapped to their socket connection IDs
+let onlineUsers = new Map();
+
+io.on('connection', (socket) => {
+  console.log(`⚡ User connected: ${socket.id}`);
+
+  // 1. Authenticate user and map their Database User ID to their Socket ID
+  socket.on('setup_session', (userId) => {
+    if (userId) {
+      onlineUsers.set(String(userId), socket.id);
+      console.log(`👤 User logged online: ${userId} -> Socket: ${socket.id}`);
+      io.emit('get_online_users', Array.from(onlineUsers.keys()));
+    }
+  });
+
+  // 2. Join a dedicated conversation room stream channel
+  socket.on('join_chat_room', (conversationId) => {
+    socket.join(String(conversationId));
+    console.log(`🚪 Socket ${socket.id} joined conversation pool room: ${conversationId}`);
+  });
+
+  // 3. Listen for real-time text dispatch broadcast relays
+  socket.on('send_instant_message', (messageData) => {
+    // messageData will contain: { conversationId, sender, text, createdAt, recipientId }
+    const { conversationId, recipientId } = messageData;
+    
+    // Broadcast inside the room channel instantly
+    socket.to(String(conversationId)).emit('receive_instant_message', messageData);
+    
+    // Fallback: If recipient is not currently viewing the room but is online elsewhere, ping them
+    const recipientSocketId = onlineUsers.get(String(recipientId));
+    if (recipientSocketId) {
+      io.to(recipientSocketId).emit('incoming_message_notification', {
+        conversationId,
+        text: messageData.text
+      });
+    }
+  });
+
+  // Handle sudden disconnections gracefully
+  socket.on('disconnect', () => {
+    console.log(`❌ User disconnected: ${socket.id}`);
+    for (let [userId, socketId] of onlineUsers.entries()) {
+      if (socketId === socket.id) {
+        onlineUsers.delete(userId);
+        break;
+      }
+    }
+    io.emit('get_online_users', Array.from(onlineUsers.keys()));
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+// CRITICAL FIX: Server variable needs to listen now instead of app directly
+server.listen(PORT, () => {
+  console.log(`Server is running with real-time sockets on port ${PORT}`);
 });

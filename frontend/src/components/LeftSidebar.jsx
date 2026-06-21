@@ -33,77 +33,98 @@ export default function LeftSidebar() {
     fetchMe();
   }, []);
 
-  // ✨ UPDATED: Added Brand Pages explicitly inside navigational matrices array
   const navItems = [
     { name: 'Home', path: '/', icon: '🏠' },
     { name: 'Network', path: '/network', icon: '👥' },
-    { name: 'Brand Pages', path: '/pages', icon: '🏢' }, // 👈 Naya access hook inject kiya
+    { name: 'Brand Pages', path: '/pages', icon: '🏢' }, 
+    { name: 'Messages', path: '/messages', icon: '💬' }, 
     { name: 'Notifications', path: '/notifications', icon: '🔔' },
     { name: 'Profile', path: '/profile', icon: '👤' },
   ];
 
   return (
-    <div className="sticky top-20 space-y-4 animate-fadeIn">
-      {/* Mini Profile Card */}
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-        {/* ✨ Theme Updated to premium slate */}
-        <div className="h-16 bg-gradient-to-r from-slate-800 to-slate-900"></div>
-        <div className="px-4 pb-4 text-center relative">
-          
-          <div className="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center text-xl font-extrabold border-4 border-white mx-auto -mt-8 uppercase overflow-hidden shadow-sm">
-            {currentUser?.avatar ? <img src={currentUser.avatar} alt="User avatar" className="w-full h-full object-cover" /> : getInitials(currentUser?.name)}
-          </div>
-          
-          <h2 className="mt-2 text-base font-bold text-slate-900 leading-tight tracking-tight">
-            {currentUser ? currentUser.name : "Loading..."}
-          </h2>
-          
-          <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
-            {currentUser?.jobTitle ? `${currentUser.jobTitle}` : currentUser?.tagline || 'Active Network Node'}
-          </p>
-          
-          {/* ✨ Dynamic Verification Label Badge on Sidebar Core */}
-          {currentUser?.verificationStatus === 'verified' ? (
-            <span className="inline-block mt-2 px-2.5 py-0.5 bg-teal-50 text-teal-700 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-teal-100">
-              Verified Official 🏛️
-            </span>
-          ) : currentUser?.verificationStatus === 'pending' ? (
-            <span className="inline-block mt-2 px-2.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-amber-100">
-              Review Pending ⏳
-            </span>
-          ) : (
-            <span className="inline-block mt-2 px-2.5 py-0.5 bg-slate-50 text-slate-600 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-slate-100">
-              Network Member
-            </span>
-          )}
+    <>
+      {/* 🖥️ DESKTOP VIEW (Visible only on md screens and above) */}
+      <div className="hidden md:block sticky top-20 space-y-4 animate-fadeIn">
+        {/* Mini Profile Card */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
+          <div className="h-16 bg-gradient-to-r from-slate-800 to-slate-900"></div>
+          <div className="px-4 pb-4 text-center relative">
+            <div className="w-16 h-16 bg-slate-900 text-white rounded-full flex items-center justify-center text-xl font-extrabold border-4 border-white mx-auto -mt-8 uppercase overflow-hidden shadow-sm">
+              {currentUser?.avatar ? <img src={currentUser.avatar} alt="User avatar" className="w-full h-full object-cover" /> : getInitials(currentUser?.name)}
+            </div>
+            
+            <h2 className="mt-2 text-base font-bold text-slate-900 leading-tight tracking-tight">
+              {currentUser ? currentUser.name : "Loading..."}
+            </h2>
+            
+            <p className="text-[11px] text-slate-500 mt-0.5 font-medium">
+              {currentUser?.jobTitle ? `${currentUser.jobTitle}` : currentUser?.tagline || 'Active Network Node'}
+            </p>
+            
+            {currentUser?.verificationStatus === 'verified' ? (
+              <span className="inline-block mt-2 px-2.5 py-0.5 bg-teal-50 text-teal-700 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-teal-100">
+                Verified Official 🏛️
+              </span>
+            ) : currentUser?.verificationStatus === 'pending' ? (
+              <span className="inline-block mt-2 px-2.5 py-0.5 bg-amber-50 text-amber-700 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-amber-100">
+                Review Pending ⏳
+              </span>
+            ) : (
+              <span className="inline-block mt-2 px-2.5 py-0.5 bg-slate-50 text-slate-600 text-[10px] font-extrabold uppercase tracking-wide rounded-full border border-slate-100">
+                Network Member
+              </span>
+            )}
 
-          <hr className="my-3.5 border-slate-100" />
-          <Link to="/profile" className="text-xs font-bold text-slate-900 hover:underline transition">
-            View My Profile
-          </Link>
+            <hr className="my-3.5 border-slate-100" />
+            <Link to="/profile" className="text-xs font-bold text-slate-900 hover:underline transition">
+              View My Profile
+            </Link>
+          </div>
+        </div>
+
+        {/* Navigation Menu Sidebar Block */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-2 shadow-sm">
+          {navItems.map((item) => {
+            const isActive = location.pathname === item.path;
+            return (
+              <Link 
+                key={item.name} 
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+                  isActive 
+                    ? 'bg-slate-950 text-white shadow-sm' 
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <span className="text-base">{item.icon}</span>
+                {item.name}
+              </Link>
+            );
+          })}
         </div>
       </div>
 
-      {/* Navigation Menu Sidebar Block */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-2 shadow-sm">
+      {/* 📱 MOBILE BOTTOM NAVIGATION (Visible only on mobile screens below md) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-2 py-1 z-50 shadow-[0_-2px_10px_rgba(0,0,0,0.05)] flex justify-around items-center">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
           return (
             <Link 
               key={item.name} 
               to={item.path}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
+              className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
                 isActive 
-                  ? 'bg-slate-950 text-white shadow-sm' 
-                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  ? 'text-slate-950 font-extrabold' 
+                  : 'text-gray-400 font-medium'
               }`}
             >
-              <span className="text-base">{item.icon}</span>
-              {item.name}
+              <span className="text-xl mb-0.5">{item.icon}</span>
+              <span className="text-[10px] tracking-tight">{item.name}</span>
             </Link>
           );
         })}
       </div>
-    </div>
+    </>
   );
 }
