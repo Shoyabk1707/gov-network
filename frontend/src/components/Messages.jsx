@@ -166,10 +166,12 @@ export default function Messages() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-140px)] grid grid-cols-1 md:grid-cols-12 overflow-hidden animate-fadeIn text-left">
-      <div className="md:col-span-4 border-r border-gray-100 flex flex-col h-full bg-slate-50/50">
-        <div className="p-4 border-b border-gray-100 bg-white">
-          <h2 className="text-base font-bold text-slate-900 tracking-tight">Messaging Streams</h2>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-140px)] md:h-[calc(100vh-140px)] grid grid-cols-1 md:grid-cols-12 overflow-hidden animate-fadeIn text-left">
+      
+      {/* 📁 LEFT INBOX STREAM PANEL (Hidden on mobile if a chat stream is active) */}
+      <div className={`md:col-span-4 border-r border-gray-100 flex flex-col h-full bg-slate-50/50 ${activeChat ? 'hidden md:flex' : 'flex'}`}>
+        <div className="p-4 border-b border-gray-100 bg-white flex items-center justify-between">
+          <h2 className="text-base font-bold text-slate-900 tracking-tight">Messages</h2>
         </div>
         <div className="flex-1 overflow-y-auto divide-y divide-gray-50 pr-1">
           {loadingChats ? (
@@ -186,7 +188,14 @@ export default function Messages() {
                     {targetUser.avatar ? <img src={targetUser.avatar} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : getInitials(targetUser.name)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-slate-900 text-sm truncate leading-snug">{targetUser.name}</h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-900 text-sm truncate leading-snug">{targetUser.name}</h4>
+                      {chat.lastMessage && (
+                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap ml-2">
+                          {new Date(chat.lastMessage.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{targetUser.jobTitle || "Member"}</p>
                     <p className="text-xs text-slate-500 truncate mt-1 font-normal">
                       {chat.lastMessage?.sender === currentUserId ? 'You: ' : ''}{chat.lastMessage?.text || 'Started a new bridge.'}
@@ -199,10 +208,23 @@ export default function Messages() {
         </div>
       </div>
 
-      <div className="md:col-span-8 flex flex-col h-full bg-white">
+      {/* 💬 RIGHT ACTIVE CHAT DIALOG WINDOW (Hidden on mobile if no active chat thread selected) */}
+      <div className={`md:col-span-8 flex flex-col h-full bg-white ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
         {activeChat ? (
           <>
-            <div className="p-3.5 border-b border-gray-100 flex items-center gap-3">
+            {/* STICKY CHAT TOP HEADER WITH BACK NAVIGATION CONTROLS */}
+            <div className="p-3.5 border-b border-gray-100 flex items-center gap-3 bg-white">
+              {/* Sleek Twitter-style back trigger arrow visible strictly on mobile viewports */}
+              <button 
+                onClick={() => setActiveChat(null)}
+                className="md:hidden p-1.5 rounded-full hover:bg-slate-100 transition mr-1"
+                title="Back to inbox list"
+              >
+                <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+              </button>
+
               <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase">
                 {getRecipientUser(activeChat).avatar ? <img src={getRecipientUser(activeChat).avatar} alt="Avatar" className="w-full h-full object-cover rounded-full" /> : getInitials(getRecipientUser(activeChat).name)}
               </div>
@@ -212,6 +234,7 @@ export default function Messages() {
               </div>
             </div>
 
+            {/* MESSAGING LOG TIMELINE BODY */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40">
               {loadingMessages ? (
                 <div className="text-center text-xs font-semibold text-slate-400 animate-pulse pt-6">Pulling logs...</div>
@@ -254,7 +277,8 @@ export default function Messages() {
               <div ref={messagesEndRef} />
             </div>
 
-            <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-100 flex items-center gap-2 bg-white">
+            {/* SEND TRANSMISSION ACTION FOOTER */}
+            <form onSubmit={handleSendMessage} className="p-3 border-t border-gray-100 flex items-center gap-2 bg-white mb-14 md:mb-0">
               <input ref={inputFieldRef} type="text" placeholder="Write a message response..." value={newMessageText} onChange={handleInputChange} className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:bg-white focus:ring-1 focus:ring-slate-900 transition-all" required />
               <button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition shadow-sm shrink-0">Send</button>
             </form>
