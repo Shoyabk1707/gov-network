@@ -49,7 +49,6 @@ export default function UserProfile({ userId, onBack }) {
   // 💬 CHAT INITIATION TRIGGER ENGINE
   const handleStartChat = async () => {
   try {
-    // Strict matching with backend configuration map
     const res = await fetch(`${API_BASE_URL}/api/chat/start`, {
       method: 'POST',
       headers: {
@@ -59,15 +58,20 @@ export default function UserProfile({ userId, onBack }) {
       body: JSON.stringify({ recipientId: userId })
     });
 
-    if (res.ok) {
+    const conversationData = await res.json();
+
+    if (res.ok && conversationData) {
       toast.success("Opening secure stream... 💬");
-      navigate('/messages', { state: { autoSelectChatId: conversationData._id } });
+      // Double check backend key pattern (_id ya id)
+      const chatRoomId = conversationData._id || conversationData.id;
+      
+      navigate('/messages', { state: { autoSelectChatId: chatRoomId } }); 
     } else {
-      const errData = await res.json();
-      toast.error(errData.message || "Failed to initiate chat bridge.");
+      toast.error(conversationData.message || "Failed to initiate chat bridge.");
     }
   } catch (err) {
-    toast.error("Network sync failure.");
+    console.error("Chat navigation crash logs:", err);
+    toast.error("Navigation routing layout fault.");
   }
 };
 
