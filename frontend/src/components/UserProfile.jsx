@@ -61,7 +61,7 @@ export default function UserProfile({ userId, onBack }) {
 
     if (res.ok) {
       toast.success("Opening secure stream... 💬");
-      navigate('/messages'); 
+      navigate('/messages', { state: { autoSelectChatId: conversationData._id } });
     } else {
       const errData = await res.json();
       toast.error(errData.message || "Failed to initiate chat bridge.");

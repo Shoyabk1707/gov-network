@@ -115,6 +115,13 @@ io.on('connection', (socket) => {
     }
     io.emit('get_online_users', Array.from(onlineUsers.keys()));
   });
+
+  // ⌨️ Relay typing states across active room pools instantly
+  socket.on('user_typing_state', (typingData) => {
+    const { conversationId } = typingData;
+    // Broadcast typing status inside the specific conversation room channel
+    socket.to(String(conversationId)).emit('user_typing_state', typingData);
+  });
 });
 
 const PORT = process.env.PORT || 5000;
