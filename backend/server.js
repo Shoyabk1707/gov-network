@@ -75,8 +75,10 @@ io.on('connection', (socket) => {
   socket.on('setup_session', (userId) => {
     if (userId) {
       onlineUsers.set(String(userId), socket.id);
-      console.log(`👤 User logged online: ${userId} -> Socket: ${socket.id}`);
-      io.emit('get_online_users', Array.from(onlineUsers.keys()));
+      console.log(`👤 User logged online: ${userId}`);
+      
+      // ✨ BROADCAST: Saare users ko live active status sync karo instantly
+      io.emit('update_online_users', Array.from(onlineUsers.keys()));
     }
   });
 
@@ -113,7 +115,8 @@ io.on('connection', (socket) => {
         break;
       }
     }
-    io.emit('get_online_users', Array.from(onlineUsers.keys()));
+    // ✨ BROADCAST: User ke jate hi list refresh karo live users ki
+    io.emit('update_online_users', Array.from(onlineUsers.keys()));
   });
 
   // ⌨️ Relay typing states across active room pools instantly

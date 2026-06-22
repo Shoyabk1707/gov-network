@@ -1,3 +1,4 @@
+const mongoose = require('mongoose'); // 👈 Add this line to prevent any object/ID utility crash
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
@@ -12,7 +13,6 @@ const startConversation = async (req, res) => {
       return res.status(400).json({ message: "You cannot start a conversation with yourself" });
     }
 
-    // Check if conversation already exists between these two participants
     let conversation = await Conversation.findOne({
       participants: { $all: [currentUserId, recipientId] }
     }).populate('participants', 'name jobTitle department avatar');
@@ -32,25 +32,48 @@ const startConversation = async (req, res) => {
   }
 };
 
-// 👥 2. Get All Active Conversations List for a User
+// 👥 2. Get All Active Conversations List for a User (DEBUGGED 🛠️)
 const getConversations = async (req, res) => {
   try {
-    const currentUserId = req.user?._id || req.user?.id || req.user;
+    // 🔥 Sabse safe tarika ID nikalne ka jo baki functions me chal raha hai
+    const currentUserId = req.user?._id || req.user?.id || req.user; 
 
+    if (!currentUserId) {
+      return res.status(401).json({ message: "User context not identified." });
+    }
+
+    // Saare conversations fetch karo jisme current user participant hai
     const conversations = await Conversation.find({
       participants: currentUserId
     })
-      .populate('participants', 'name jobTitle department avatar')
-      .populate({
-        path: 'lastMessage',
-        select: 'text sender createdAt'
-      })
-      .sort({ updatedAt: -1 }); // Modern updates first rule
+    .populate('participants', 'name avatar jobTitle')
+    .populate('lastMessage')
+    .sort({ updatedAt: -1 });
 
-    res.json(conversations);
-  } catch (error) {
-    console.error("Get Conversations Error:", error.message);
-    res.status(500).json({ message: "Server Error fetching conversations stream" });
+    if (!conversations || conversations.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    // Har conversation ke liye individually unreadCount calculate karo
+    const enrichedConversations = await Promise.all(conversations.map(async (chat) => {
+      const chatObj = chat.toObject();
+      try {
+        const unreadCount = await Message.countDocuments({
+          conversationId: chat._id,
+          sender: { $ne: currentUserId }, // Jo kisi aur ne bheja ho
+          seen: false // Aur abhi tak unseen ho
+        });
+        chatObj.unreadCount = unreadCount || 0;
+      } catch (err) {
+        chatObj.unreadCount = 0;
+      }
+      return chatObj;
+    }));
+
+    res.status(200).json(enrichedConversations);
+  } catch (err) {
+    console.error("Get Conversations Crash Trace:", err.message);
+    res.status(500).json({ message: "Error pulling conversation ledger metadata." });
   }
 };
 
@@ -64,14 +87,12 @@ const sendMessage = async (req, res) => {
       return res.status(400).json({ message: "Message content cannot be empty" });
     }
 
-    // 1. Create message item inside memory registry
     const newMessage = await Message.create({
       conversationId,
       sender: currentUserId,
       text: text.trim()
     });
 
-    // 2. Lock dynamic index pointer to parent log context
     await Conversation.findByIdAndUpdate(conversationId, {
       lastMessage: newMessage._id
     });
@@ -89,7 +110,7 @@ const getMessages = async (req, res) => {
     const { conversationId } = req.params;
     
     const messages = await Message.find({ conversationId })
-      .sort({ createdAt: 1 }); // Timelines must be chronological ascending order
+      .sort({ createdAt: 1 });
 
     res.json(messages);
   } catch (error) {
@@ -98,9 +119,28 @@ const getMessages = async (req, res) => {
   }
 };
 
+// 🔴 5. Mark Messages as Seen (DEBUGGED 🛠️)
+const markAsSeen = async (req, res) => {
+  try {
+    const { conversationId } = req.params;
+    const currentUserId = req.user?._id || req.user?.id || req.user; // 🔥 Aligned with standard extractors
+
+    await Message.updateMany(
+      { conversationId, sender: { $ne: currentUserId }, seen: false },
+      { $set: { seen: true } }
+    );
+
+    res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Mark As Seen Crash Trace:", err.message);
+    res.status(500).json({ message: "Fault writing seen flags state." });
+  }
+};
+
 module.exports = {
   startConversation,
   getConversations,
   sendMessage,
-  getMessages
+  getMessages,
+  markAsSeen
 };

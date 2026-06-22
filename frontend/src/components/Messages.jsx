@@ -15,12 +15,18 @@ export default function Messages() {
   const [loadingChats, setLoadingChats] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isRecipientTyping, setIsRecipientTyping] = useState(false);
+  const [onlineUsersList, setOnlineUsersList] = useState([]);
 
   const token = localStorage.getItem('token');
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
   const inputFieldRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  const activeChatRef = useRef(null);
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
 
   let currentUserId = null;
   try {
@@ -58,7 +64,14 @@ export default function Messages() {
       const res = await fetch(`${API_BASE_URL}/api/chat/messages/${conversationId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) setMessages(await res.json());
+      if (res.ok) {
+        setMessages(await res.json());
+        await fetch(`${API_BASE_URL}/api/chat/seen/${conversationId}`, {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setConversations(prev => prev.map(c => c._id === conversationId ? { ...c, unreadCount: 0 } : c));
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -78,23 +91,44 @@ export default function Messages() {
     socketRef.current = io(API_BASE_URL, { auth: { token }, transports: ['websocket'] });
     if (currentUserId) socketRef.current.emit('setup_session', currentUserId);
 
-    socketRef.current.on('receive_instant_message', (incomingMessage) => {
-      if (activeChat && String(incomingMessage.conversationId) === String(activeChat._id)) {
+    socketRef.current.on('receive_instant_message', async (incomingMessage) => {
+      const currentActive = activeChatRef.current;
+
+      if (currentActive && String(incomingMessage.conversationId) === String(currentActive._id)) {
         setMessages((prev) => [...prev, incomingMessage]);
+        await fetch(`${API_BASE_URL}/api/chat/seen/${currentActive._id}`, {
+          method: 'PATCH',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        setConversations(prev => prev.map(c => 
+          String(c._id) === String(incomingMessage.conversationId)
+            ? { ...c, lastMessage: incomingMessage, unreadCount: 0 }
+            : c
+        ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+      } else {
+        setConversations(prev => prev.map(c => 
+          String(c._id) === String(incomingMessage.conversationId)
+            ? { ...c, lastMessage: incomingMessage, unreadCount: (c.unreadCount || 0) + 1 }
+            : c
+        ).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
       }
-      fetchConversations();
     });
 
     socketRef.current.on('user_typing_state', (data) => {
-      if (activeChat && String(data.conversationId) === String(activeChat._id) && String(data.senderId) !== String(currentUserId)) {
+      const currentActive = activeChatRef.current;
+      if (currentActive && String(data.conversationId) === String(currentActive._id) && String(data.senderId) !== String(currentUserId)) {
         setIsRecipientTyping(data.isTyping);
       }
+    });
+
+    socketRef.current.on('update_online_users', (users) => {
+      setOnlineUsersList(users);
     });
 
     return () => {
       if (socketRef.current) socketRef.current.disconnect();
     };
-  }, [activeChat]);
+  }, []);
 
   useEffect(() => {
     if (activeChat && socketRef.current) {
@@ -143,7 +177,9 @@ export default function Messages() {
         setMessages((prev) => [...prev, savedMsg]);
         setNewMessageText('');
         socketRef.current.emit('send_instant_message', { ...savedMsg, recipientId: targetRecipient._id || targetRecipient });
-        fetchConversations();
+        setConversations(prev => prev.map(c => 
+          String(c._id) === String(activeChat._id) ? { ...c, lastMessage: savedMsg } : c
+        ));
       }
     } catch (err) {
       toast.error("Failed to send text.");
@@ -166,6 +202,7 @@ export default function Messages() {
   return (
     <div className="bg-white rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-145px)] md:h-[calc(100vh-140px)] flex overflow-hidden animate-fadeIn text-left w-full">
       
+      {/* 📁 LEFT SIDE INBOX */}
       <div className={`md:w-1/3 border-r border-gray-100 flex flex-col h-full bg-slate-50/50 w-full ${activeChat ? 'hidden md:flex' : 'flex'}`}>
         <div className="p-4 border-b border-gray-100 bg-white">
           <h2 className="text-base font-bold text-slate-900 tracking-tight">Messages</h2>
@@ -179,33 +216,44 @@ export default function Messages() {
             conversations.map((chat) => {
               const targetUser = getRecipientUser(chat);
               const isActive = activeChat?._id === chat._id;
+              const isUserOnline = onlineUsersList.includes(String(targetUser._id || targetUser));
+              const hasUnread = chat.unreadCount > 0;
+
               return (
                 <div key={chat._id} onClick={() => setActiveChat(chat)} className={`p-3.5 flex items-center gap-3 cursor-pointer transition-all duration-200 ${isActive ? 'bg-white border-l-4 border-slate-900 shadow-sm' : 'hover:bg-white'}`}>
-                  <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase overflow-hidden">
-                    {targetUser.avatar && targetUser.avatar.startsWith('http') ? (
-                      <img 
-                        src={targetUser.avatar} 
-                        alt={targetUser.name} 
-                        className="w-full h-full object-cover"
-                        onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerText = getInitials(targetUser.name); }}
-                      />
-                    ) : (
-                      getInitials(targetUser.name)
+                  <div className="relative shrink-0">
+                    <div className="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs uppercase overflow-hidden">
+                      {targetUser.avatar && targetUser.avatar.startsWith('http') ? (
+                        <img src={targetUser.avatar} alt={targetUser.name} loading="lazy" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerText = getInitials(targetUser.name); }} />
+                      ) : (
+                        getInitials(targetUser.name)
+                      )}
+                    </div>
+                    {isUserOnline && (
+                      <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white animate-pulse" />
                     )}
                   </div>
+                  
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-slate-900 text-sm truncate leading-snug">{targetUser.name}</h4>
+                      <h4 className={`text-sm truncate leading-snug ${hasUnread ? 'font-extrabold text-slate-950' : 'font-bold text-slate-800'}`}>{targetUser.name}</h4>
                       {chat.lastMessage && (
-                        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap ml-2">
+                        <span className={`text-[10px] whitespace-nowrap ml-2 ${hasUnread ? 'font-bold text-slate-900' : 'font-medium text-gray-400'}`}>
                           {new Date(chat.lastMessage.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </span>
                       )}
                     </div>
                     <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{targetUser.jobTitle || "Member"}</p>
-                    <p className="text-xs text-slate-500 truncate mt-1 font-normal">
-                      {chat.lastMessage?.sender === currentUserId ? 'You: ' : ''}{chat.lastMessage?.text || 'Started a new bridge.'}
-                    </p>
+                    <div className="flex items-center justify-between mt-1 gap-2">
+                      <p className={`text-xs truncate flex-1 ${hasUnread ? 'font-bold text-slate-950' : 'text-slate-500 font-normal'}`}>
+                        {chat.lastMessage?.sender === currentUserId ? 'You: ' : ''}{chat.lastMessage?.text || 'Started a new bridge.'}
+                      </p>
+                      {hasUnread && (
+                        <span className="bg-slate-950 text-white text-[10px] font-black h-4 min-w-4 px-1 rounded-full flex items-center justify-center tracking-tighter shrink-0 shadow-sm border border-white">
+                          {chat.unreadCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -214,6 +262,7 @@ export default function Messages() {
         </div>
       </div>
 
+      {/* 💬 RIGHT ACTIVE CHAT LOGS */}
       <div className={`md:w-2/3 flex flex-col h-full bg-white w-full ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
         {activeChat ? (
           <>
@@ -223,16 +272,16 @@ export default function Messages() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </button>
-              <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 uppercase overflow-hidden">
-                {getRecipientUser(activeChat).avatar && getRecipientUser(activeChat).avatar.startsWith('http') ? (
-                  <img 
-                    src={getRecipientUser(activeChat).avatar} 
-                    alt={getRecipientUser(activeChat).name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerText = getInitials(getRecipientUser(activeChat).name); }}
-                  />
-                ) : (
-                  getInitials(getRecipientUser(activeChat).name)
+              <div className="relative shrink-0">
+                <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs uppercase overflow-hidden">
+                  {getRecipientUser(activeChat).avatar && getRecipientUser(activeChat).avatar.startsWith('http') ? (
+                    <img src={getRecipientUser(activeChat).avatar} alt={getRecipientUser(activeChat).name} loading="lazy" className="w-full h-full object-cover" onError={(e) => { e.target.style.display = 'none'; e.target.parentElement.innerText = getInitials(getRecipientUser(activeChat).name); }} />
+                  ) : (
+                    getInitials(getRecipientUser(activeChat).name)
+                  )}
+                </div>
+                {onlineUsersList.includes(String(getRecipientUser(activeChat)._id || getRecipientUser(activeChat))) && (
+                  <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-green-500 ring-1 ring-white" />
                 )}
               </div>
               <div>
