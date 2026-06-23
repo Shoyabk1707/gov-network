@@ -2,13 +2,13 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
-const http = require('http'); // ✨ INJECTED: Standard HTTP module for Socket infrastructure
-const { Server } = require('socket.io'); // ✨ INJECTED: Socket.io Server class
+const http = require('http'); // ✨ Standard HTTP module for Socket infrastructure
+const { Server } = require('socket.io'); // ✨ Socket.io Server class
 const connectDB = require('./config/db');
 const chatRoutes = require('./routes/chatRoutes');
 
 const app = express();
-const server = http.createServer(app); // ✨ UPDATED: Express app mapped into HTTP Server instance
+const server = http.createServer(app); // ✨ Express app mapped into HTTP Server instance
 
 // Connect Database
 connectDB();
@@ -17,7 +17,7 @@ connectDB();
 const allowedOrigins = [
   'http://localhost:5173', 
   'https://gov-network.vercel.app',
-  'https://gov-network-1m0wj5zq7-gov-network-s-projects.vercel.app/'
+  'https://gov-network-1m0wj5zq7-gov-network-s-projects.vercel.app' // 👈 Fixed trailing slash
 ];
 
 app.use(cors({
@@ -26,8 +26,9 @@ app.use(cors({
     
     const isLocalhost = origin.startsWith('http://localhost:');
     const isVercel = origin.endsWith('.vercel.app');
+    const isAllowedArray = allowedOrigins.includes(origin);
     
-    if (isLocalhost || isVercel) {
+    if (isLocalhost || isVercel || isAllowedArray) {
       return callback(null, true);
     } else {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
@@ -35,8 +36,8 @@ app.use(cors({
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // 👈 Added PATCH & OPTIONS for binary/pre-flight handshakes
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'] // 👈 Extended for multipart boundary support
 }));
 
 app.use(express.json());
@@ -90,7 +91,6 @@ io.on('connection', (socket) => {
 
   // 3. Listen for real-time text dispatch broadcast relays
   socket.on('send_instant_message', (messageData) => {
-    // messageData will contain: { conversationId, sender, text, createdAt, recipientId }
     const { conversationId, recipientId } = messageData;
     
     // Broadcast inside the room channel instantly
@@ -122,13 +122,11 @@ io.on('connection', (socket) => {
   // ⌨️ Relay typing states across active room pools instantly
   socket.on('user_typing_state', (typingData) => {
     const { conversationId } = typingData;
-    // Broadcast typing status inside the specific conversation room channel
     socket.to(String(conversationId)).emit('user_typing_state', typingData);
   });
 });
 
 const PORT = process.env.PORT || 5000;
-// CRITICAL FIX: Server variable needs to listen now instead of app directly
 server.listen(PORT, () => {
   console.log(`Server is running with real-time sockets on port ${PORT}`);
 });

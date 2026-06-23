@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import toast from 'react-hot-toast';
@@ -8,6 +8,7 @@ import PostCard from './PostCard';
 export default function Profile() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const fileInputRef = useRef(null); // 👈 Hidden file explorer router link hook
 
   const [user, setUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -17,6 +18,7 @@ export default function Profile() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showExpModal, setShowExpModal] = useState(false);
   const [showEduModal, setShowEduModal] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false); // 👈 Premium loading state spinner flag
   
   const [formData, setFormData] = useState({});
   const [expData, setExpData] = useState({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
@@ -64,6 +66,45 @@ export default function Profile() {
   };
 
   useEffect(() => { fetchProfileData(); fetchSavedPosts(); }, []);
+
+  // 🔥 MULTIPART FORM DATA FILE DISPATCHER LAYER
+  const handleAvatarFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // File validation limits check
+    if (file.size > 5 * 1024 * 1024) {
+      return toast.error("File size must be under 5MB!");
+    }
+
+    const uploadFormData = new FormData();
+    uploadFormData.append('avatar', file);
+
+    setUploadingAvatar(true);
+    const loadToast = toast.loading("Uploading to Cloudinary registry...");
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/auth/update-avatar`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }, // Content-Type must be omitted for boundary generation
+        body: uploadFormData
+      });
+
+      const responseData = await res.json();
+
+      if (res.ok) {
+        toast.success("Profile avatar updated! 📸", { id: loadToast });
+        setUser(prev => ({ ...prev, avatar: responseData.avatar }));
+      } else {
+        toast.error(responseData.message || "Failed to parse attachment stream", { id: loadToast });
+      }
+    } catch (err) {
+      console.error("FRONTEND CATCH BLOCK TRACE:", err);
+      toast.error(`Upload Fail: ${err.message}`, { id: loadToast });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
 
   const handleMainChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
   const handleEduChange = (e) => setEduData({ ...eduData, [e.target.name]: e.target.value });
@@ -169,6 +210,15 @@ export default function Profile() {
   return (
     <div className="max-w-3xl mx-auto mt-4 space-y-4 pb-12 relative px-4 md:px-0 text-left">
       
+      {/* 📁 HIDDEN NATIVE EXPLORER CONTROLLER */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleAvatarFileChange} 
+        accept="image/png, image/jpeg, image/jpg" 
+        className="hidden" 
+      />
+
       {/* 🛠... PROFILE INTRO EDIT MODAL ... */}
       {showEditModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -247,12 +297,38 @@ export default function Profile() {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn">
         <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div> 
         <div className="px-6 pb-6 relative">
+          
+          {/* 🔥 HOVER OVERLAY CAMERA AVATAR LAYER */}
           <div className="absolute -top-16 left-6 z-10">
-            <div className="w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden uppercase">
-              {user.avatar ? <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" /> : getInitials(user.name)}
+            <div 
+              onClick={() => !uploadingAvatar && fileInputRef.current.click()}
+              className="group relative w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden uppercase cursor-pointer"
+            >
+              {uploadingAvatar ? (
+                // Smooth spinner tracker
+                <div className="absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center gap-1 text-[10px] font-black tracking-widest text-teal-400">
+                  <svg className="animate-spin h-5 w-5 text-teal-400" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span>SYNCING</span>
+                </div>
+              ) : (
+                <>
+                  {user.avatar ? <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover transition duration-200 group-hover:scale-105" /> : getInitials(user.name)}
+                  
+                  {/* Subtle Dark Glass Camera Backdrop Overlay */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200 backdrop-blur-xs">
+                    <svg className="w-6 h-6 text-white drop-shadow-sm" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15a2.25 2.25 0 0 0 2.25-2.25V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
+                    </svg>
+                  </div>
+                </>
+              )}
             </div> 
             {user.verifiedAsOfficial && (
-              <div className="absolute bottom-2 right-2 bg-white rounded-full p-0.5 shadow-sm">
+              <div className="absolute bottom-2 right-2 bg-white rounded-full p-0.5 shadow-sm z-20">
                 <svg className="w-6 h-6 text-teal-600 fill-current" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                 </svg>
@@ -366,7 +442,7 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* 🔥 FIXED SECTION: Injected the missing Education Credentials timeline */}
+          {/* Education Credentials Timeline */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Education Credentials</h2>

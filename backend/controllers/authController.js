@@ -1,21 +1,18 @@
-// backend/controllers/authController.js
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const OtpToken = require('../models/OtpToken'); 
 const cryptoService = require('../services/cryptoService'); 
 const emailService = require('../services/emailService'); 
-const { OAuth2Client } = require('google-auth-library'); // ✨ NAYA: Google Auth Library
+const { OAuth2Client } = require('google-auth-library');
 
 // Initialize Google Client
-// TODO: Replace with your actual Google Client ID from Google Cloud Console
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID); 
 
 // ==========================================
 // 🚀 PHASE 1: INITIALIZE OTP VERIFICATION LOOP
 // ==========================================
 const requestOtp = async (req, res) => {
-  // ... (No changes needed here) ...
   try {
     const { email } = req.body;
     const userExists = await User.findOne({ email });
@@ -40,7 +37,6 @@ const requestOtp = async (req, res) => {
 // ==========================================
 const verifyOtpAndRegister = async (req, res) => {
   try {
-    // ✨ FIX: Removed 'role' from expected payload
     const { name, email, password, otp } = req.body;
 
     const tokenRecord = await OtpToken.findOne({ email });
@@ -64,7 +60,6 @@ const verifyOtpAndRegister = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // ✨ FIX: Unified Account Creation (No role passed)
     const newUser = await User.create({
       name,
       email,
@@ -89,9 +84,8 @@ const verifyOtpAndRegister = async (req, res) => {
 // ==========================================
 const googleAuth = async (req, res) => {
   try {
-    const { token } = req.body; // Token sent from the frontend Google Sign-In button
+    const { token } = req.body;
 
-    // Verify the Google JWT token
     const ticket = await googleClient.verifyIdToken({
       idToken: token,
       audience: process.env.GOOGLE_CLIENT_ID, 
@@ -100,26 +94,21 @@ const googleAuth = async (req, res) => {
     const payload = ticket.getPayload();
     const { sub: googleId, email, name, picture: avatar } = payload;
 
-    // Check if user already exists
     let user = await User.findOne({ email });
 
     if (!user) {
-      // Create a new user if they don't exist (No password needed for Google Auth)
       user = await User.create({
         name,
         email,
         googleId,
         avatar,
-        // Password is not required per our updated schema
       });
     } else if (!user.googleId) {
-      // If user exists (signed up via email) but logging in with Google now, link the account
       user.googleId = googleId;
       user.avatar = avatar || user.avatar;
       await user.save();
     }
 
-    // Generate our system's JWT
     const authToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
 
     res.status(200).json({
@@ -134,7 +123,6 @@ const googleAuth = async (req, res) => {
   }
 };
 
-
 // ==========================================
 // 🔐 SECURE PORTED SESSIONS: LOGIN & RETRIEVAL
 // ==========================================
@@ -143,7 +131,6 @@ const loginUser = async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    // Check if user exists and HAS a password (might be a Google-only account)
     if (!user || !user.password) {
       return res.status(400).json({ message: 'Invalid credentials or please login with Google.' });
     }
@@ -178,7 +165,6 @@ const updateProfile = async (req, res) => {
     const user = await User.findById(req.user || req.user.id || req.user._id);
     if (!user) return res.status(404).json({ msg: "User not found" });
 
-    // ✨ Updated to include all relevant fields
     if (name) user.name = name;
     if (tagline !== undefined) user.tagline = tagline;
     if (city !== undefined) user.city = city;
@@ -199,11 +185,45 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// 🔥 EXTRACTED & SOLIDIFIED IMAGE MATRIX CONTROLLER
+const updateProfilePicture = async (req, res) => {
+  try {
+    const currentUserId = req.user?._id || req.user?.id || req.user;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No image file provided." });
+    }
+
+    const imageUrl = req.file.path; 
+
+    const updatedUser = await User.findByIdAndUpdate(
+      currentUserId,
+      { $set: { avatar: imageUrl } },
+      { new: true }
+    ).select('-password');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "User index matching context not found." });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile picture synced successfully!",
+      avatar: updatedUser.avatar
+    });
+  } catch (error) {
+    console.error("Avatar Upload Controller Execution Error:", error.message);
+    return res.status(500).json({ message: "Server Error uploading profile image matrix." });
+  }
+};
+
+// Clean structural multi-point naming boundaries export
 module.exports = { 
   requestOtp, 
   verifyOtpAndRegister, 
-  googleAuth, // Export new function
+  googleAuth, 
   loginUser, 
   getUserProfile, 
-  updateProfile 
+  updateProfile,
+  updateProfilePicture
 };
