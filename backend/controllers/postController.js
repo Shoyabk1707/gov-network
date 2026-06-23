@@ -11,18 +11,22 @@ const createPost = async (req, res) => {
       return res.status(400).json({ message: 'Content is required to create a post' });
     }
 
+    // 📸 INDUSTRIAL EXTRACTOR: Check karo agar cloud storage link ready hai
+    let imageUrl = null;
+    if (req.file) {
+      imageUrl = req.file.path; // Cloudinary secure string URL mapping
+    }
+
     const newPost = await Post.create({
-      // Agar post page ke throw ho rahi hai, toh user ref ko structural context ke liye rakh sakte hain, 
-      // par identity check main field 'page' hi sambhalegi
       user: currentUserId.toString(),
       content,
-      // ✨ Dono side same simple dynamic values assign ho rahi hain
       category: postType || category || 'General',
-      page: pageId || null
+      page: pageId || null,
+      image: imageUrl // 👈 Injected file string registry hook
     });
 
     const populatedPost = await Post.findById(newPost._id)
-      .populate('user', 'name role jobTitle department')
+      .populate('user', 'name role jobTitle department avatar') // Added avatar if needed
       .populate('page', 'name category');
 
     res.status(201).json(populatedPost);
@@ -35,9 +39,9 @@ const createPost = async (req, res) => {
 const getPosts = async (req, res) => {
   try {
     const posts = await Post.find({})
-      .populate('user', 'name role jobTitle department')
+      .populate('user', 'name role jobTitle department avatar')
       .populate('page', 'name category')
-      .populate('comments.user', 'name role jobTitle department')
+      .populate('comments.user', 'name role jobTitle department avatar')
       .sort({ createdAt: -1 });
 
     res.json(posts);
@@ -62,11 +66,10 @@ const likePost = async (req, res) => {
     } else {
       post.likes.push(userIdStr);
 
-      // ✨ REAL-TIME TRIGGER: Agar doosre user ki post hai, toh notification insert karo
       if (post.user && post.user.toString() !== userIdStr) {
         await Notification.create({
-          recipient: post.user, // Post likhne wala user
-          fromUser: userIdStr,  // Like karne wala user
+          recipient: post.user,
+          fromUser: userIdStr,
           type: 'like',
           postId: post._id,
           message: 'liked your post.'
@@ -120,7 +123,7 @@ const addComment = async (req, res) => {
     await post.save();
 
     const updatedPost = await Post.findById(req.params.id)
-      .populate('comments.user', 'name role jobTitle department');
+      .populate('comments.user', 'name role jobTitle department avatar');
 
     res.json(updatedPost.comments);
   } catch (error) {
@@ -132,9 +135,9 @@ const addComment = async (req, res) => {
 const getPostById = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id)
-      .populate('user', 'name role jobTitle department')
+      .populate('user', 'name role jobTitle department avatar')
       .populate('page', 'name category')
-      .populate('comments.user', 'name role jobTitle department');
+      .populate('comments.user', 'name role jobTitle department avatar');
 
     if (!post) return res.status(404).json({ message: 'Notice not found' });
 
@@ -176,7 +179,7 @@ const getSavedPosts = async (req, res) => {
     const user = await User.findById(userId).populate({
       path: 'savedPosts',
       populate: [
-        { path: 'user', select: 'name role jobTitle department' },
+        { path: 'user', select: 'name role jobTitle department avatar' },
         { path: 'page', select: 'name category' }
       ]
     });
@@ -192,11 +195,10 @@ const getSavedPosts = async (req, res) => {
 
 const getPagePosts = async (req, res) => {
   try {
-    // URL se Page ID nikal kar query chalayi
     const posts = await Post.find({ page: req.params.id })
-      .populate('user', 'name role jobTitle department')
+      .populate('user', 'name role jobTitle department avatar')
       .populate('page', 'name category')
-      .sort({ createdAt: -1 }); // Newest posts first
+      .sort({ createdAt: -1 });
 
     res.json(posts);
   } catch (error) {

@@ -7,8 +7,6 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [isCopied, setIsCopied] = useState(false);
-  
-  // 🔥 HYBRID PERSISTENT STATE: Local state sync jo localStorage se state check karegi taaki refresh resistant rahe
   const [hasSaved, setHasSaved] = useState(false);
   
   const token = localStorage.getItem('token');
@@ -41,16 +39,12 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   const isPageManager = isPagePost && pageManagerId && String(pageManagerId) === String(currentUserId);
   const canDelete = isPostAuthor || isPageManager;
 
-  // Likes check directly using array length
   const hasLiked = post.likes && post.likes.some(id => String(id) === String(currentUserId));
 
-  // 🔥 EFFECT TO LOAD SAVED INITIAL STATE (Refresh resistant bypass without backend savedBy schema)
   useEffect(() => {
-    // Agar hum profile ke saved tab par hain, toh automatically true rakho
     if (window.location.pathname.includes('profile')) {
       setHasSaved(true);
     } else {
-      // Feed page ke liye browser storage se lookup kar lo key sync
       const savedRegistry = JSON.parse(localStorage.getItem(`saved_node_${currentUserId}`)) || {};
       setHasSaved(!!savedRegistry[post._id]);
     }
@@ -79,7 +73,6 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
       const data = await res.json();
       
       if (res.ok) {
-        // Update browser storage registry context
         const savedRegistry = JSON.parse(localStorage.getItem(`saved_node_${currentUserId}`)) || {};
         const nextState = !hasSaved;
         
@@ -94,9 +87,8 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         localStorage.setItem(`saved_node_${currentUserId}`, JSON.stringify(savedRegistry));
         setHasSaved(nextState);
 
-        // 🔥 DYNAMIC PARENT TRIGGER: Yeh line profile page list se post ko bina refresh instantly gayab kar degi
         if (typeof onLike === 'function') {
-          onLike(post._id); // Re-fetch query call safely mapping context triggers
+          onLike(post._id);
         }
       } else {
         toast.error(data.message);
@@ -134,10 +126,15 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
       <div className="p-5 space-y-3">
         <div className="flex justify-between items-start gap-4">
           <div className="flex items-center gap-3">
-            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shrink-0 ${
-              isPagePost ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'
+            {/* ✨ UPDATED: User Profile Avatar Dynamic Image / Initials Selector */}
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shrink-0 overflow-hidden border ${
+              isPagePost ? 'bg-slate-900 text-white border-slate-950' : 'bg-slate-100 text-slate-800 border-slate-200'
             }`}>
-              {getAvatarInitials(authorName)}
+              {!isPagePost && post.user?.avatar ? (
+                <img src={post.user.avatar} alt={authorName} className="w-full h-full object-cover" />
+              ) : (
+                getAvatarInitials(authorName)
+              )}
             </div>
             
             <div>
@@ -177,6 +174,20 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
           {post.content}
         </p>
       </div>
+
+      {/* 📸 Attachment Image Showcase */}
+      {post.image && (
+        <div className="px-5 pb-4">
+          <div className="rounded-xl overflow-hidden border border-gray-100 bg-gray-50 max-h-[420px] flex items-center justify-center">
+            <img 
+              src={post.image} 
+              alt="Post attachment" 
+              className="w-full h-full object-cover max-h-[420px]"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      )}
       
       <div 
         className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-slate-50/50 text-slate-500 font-medium text-sm" 

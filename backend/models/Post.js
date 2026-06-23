@@ -8,17 +8,21 @@ const postSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true
+    required: false // 👈 Fixed: Ab khali text hone par bhi image successfully post ho jayegi
+  },
+  image: {
+    type: String,
+    default: null // 👈 Fixed: Main Post attachment Cloudinary URL store karne ke liye
   },
   category: {
-  type: String,
-  enum: [
-    'Networking', 'Job Updates', 'Study Resources', 'General', 
-    'Official Circular', 'Urgent Update',
-    'Exam update', 'Study material'
-  ],
-  default: 'General'
-},
+    type: String,
+    enum: [
+      'Networking', 'Job Updates', 'Study Resources', 'General', 
+      'Official Circular', 'Urgent Update',
+      'Exam update', 'Study material'
+    ],
+    default: 'General'
+  },
   page: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Page',
@@ -37,6 +41,10 @@ const postSchema = new mongoose.Schema({
     text: {
       type: String,
       required: true
+    },
+    image: { 
+      type: String, 
+      default: null 
     },
     createdAt: {
       type: Date,
