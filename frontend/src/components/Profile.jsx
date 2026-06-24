@@ -233,15 +233,33 @@ export default function Profile() {
           <div className="flex justify-end pt-4">
             <button onClick={() => setShowEditModal(true)} className="px-4 py-1.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-100 transition shadow-sm">Edit Profile</button>
           </div>
-          <div className="pt-2 mt-2">
+          <div className="pt-2 mt-2 text-left">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{user.name}</h1>
-            <div className="space-y-0.5 mb-3 mt-1">
+            
+            <div className="space-y-0.5 mb-2 mt-1">
               <p className="text-slate-800 text-[15px] font-medium">{user.tagline || 'Active Network Member'}</p>
-              {(user.jobTitle || user.department) && <p className="text-slate-500 text-[13px]">{user.jobTitle} {user.department ? `at ${user.department}` : ''}</p>}
+              {(user.jobTitle || user.department) && (
+                <p className="text-slate-500 text-[13px]">
+                  {user.jobTitle} {user.department ? `at ${user.department}` : ''}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1 text-sm text-slate-500 mb-4">
               {user.city ? `${user.city}, ${user.state}, India` : 'India'}
             </div>
+
+            {/* 👥 LINKEDIN STYLE FOLLOWERS & FOLLOWING COUNTER */}
+            <div className="flex items-center gap-2 text-sm font-semibold mb-2">
+              <span className="text-blue-600 hover:underline cursor-pointer">
+                {user.followers?.length || 0} followers
+              </span>
+              <span className="text-slate-300">•</span>
+              <span className="text-blue-600 hover:underline cursor-pointer">
+                {user.following?.length || 0} following
+              </span>
+            </div>
+
+            
           </div>
         </div>
       </div>
