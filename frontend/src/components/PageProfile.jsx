@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import SkeletonPost from './SkeletonPost';
@@ -10,6 +10,7 @@ export default function PageProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const fileInputRef = useRef(null); // 👈 File interaction reference hook
   
   const [page, setPage] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -25,6 +26,8 @@ export default function PageProfile() {
   const [selectedPostType, setSelectedPostType] = useState('General'); 
   
   const [newPostContent, setNewPostContent] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null); // 👈 Added selected image binary storage
+  const [imagePreview, setImagePreview] = useState(null); // 👈 Added image preview tracker
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
 
   const [formData, setFormData] = useState({ name: '', bio: '', about: '', website: '', location: '' });
@@ -130,25 +133,67 @@ export default function PageProfile() {
     }
   };
 
+  // ✨ IMAGE MUTATION EXTRACTION SETUPS
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("File is too large! Max limit is 5MB.");
+      return;
+    }
+
+    setSelectedImage(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // 🔥 MULTIPART DATA EXECUTOR UPGRADED
   const handleCreatePost = async (e) => {
     e.preventDefault();
-    if (!newPostContent.trim()) return toast.error("Content cannot be empty.");
+    if (!newPostContent.trim() && !selectedImage) return toast.error("Content text or an image is required.");
+    
     setIsSubmittingPost(true);
+    const loadToast = toast.loading("Publishing official page update...");
+    
+    const pageFormData = new FormData();
+    pageFormData.append('content', newPostContent.trim());
+    pageFormData.append('pageId', id);
+    pageFormData.append('category', selectedPostType);
+    
+    if (selectedImage) {
+      pageFormData.append('postImage', selectedImage); // 👈 Bind image upload field string mapping
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ content: newPostContent, pageId: id, category: selectedPostType })
+        mode: 'cors',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+          // Note: Multi-part boundaries handle automations via browser default
+        },
+        body: pageFormData
       });
 
       if (res.ok) {
-        toast.success("Broadcast notice live! 📢");
+        toast.success("Broadcast notice live! 📢", { id: loadToast });
         setNewPostContent('');
+        handleRemoveImage();
         setSelectedPostType('General');
         fetchPageDetails(); 
+      } else {
+        const errData = await res.json();
+        toast.error(errData.message || "Failed to commit post mapping.", { id: loadToast });
       }
     } catch (err) {
-      toast.error("Failed to commit post mapping.");
+      console.error("Page post submit system trace fault:", err);
+      toast.error("Failed to commit post mapping.", { id: loadToast });
     } finally {
       setIsSubmittingPost(false);
     }
@@ -175,7 +220,6 @@ export default function PageProfile() {
     }
   };
 
-  // 🔥 INTERACTION LOOPS HANDLERS FOR BRAND PIPELINES
   const handleInlinePostDelete = async (postId) => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
     try {
@@ -227,22 +271,62 @@ export default function PageProfile() {
           className="w-full bg-slate-50 border border-slate-200 p-3 rounded-xl text-sm outline-none font-medium h-20 resize-none focus:ring-1 focus:ring-slate-900 text-slate-900"
           placeholder={`What's new at ${page.name}? Share announcements, schedules...`}
         />
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <div className="flex items-center gap-2">
-            <label className="text-[11px] font-bold text-slate-400 uppercase">Post Type:</label>
-            <select 
-              value={selectedPostType} 
-              onChange={(e) => setSelectedPostType(e.target.value)}
-              className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:ring-1 focus:ring-slate-900"
+
+        {/* 📸 HIDDEN FILE SELECTOR & MULTIPART PREVIEW STACK */}
+        {imagePreview && (
+          <div className="relative inline-block rounded-xl overflow-hidden border border-gray-200 max-h-48 bg-gray-50 mt-1">
+            <img src={imagePreview} alt="Broadcast attachment preview" className="max-h-48 object-contain rounded-xl" />
+            <button
+              type="button"
+              onClick={handleRemoveImage}
+              className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white rounded-full p-1 shadow-md transition-all"
             >
-              <option value="General">General</option>
-              <option value="Exam update">Exam update</option>
-              <option value="Study material">Study material</option>
-            </select>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path>
+              </svg>
+            </button>
           </div>
+        )}
+
+        <input 
+          type="file" 
+          ref={fileInputRef}
+          onChange={handleImageChange}
+          accept="image/*"
+          className="hidden" 
+        />
+
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label className="text-[11px] font-bold text-slate-400 uppercase">Post Type:</label>
+              <select 
+                value={selectedPostType} 
+                onChange={(e) => setSelectedPostType(e.target.value)}
+                className="bg-slate-100 border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none cursor-pointer focus:ring-1 focus:ring-slate-900"
+              >
+                <option value="General">General</option>
+                <option value="Exam update">Exam update</option>
+                <option value="Study material">Study material</option>
+              </select>
+            </div>
+
+            {/* 🔴 ACTION TRIGGER: Media Attachment Activator Layer */}
+            <button 
+              type="button" 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-1 text-slate-500 hover:text-slate-900 text-xs font-bold uppercase tracking-wider transition"
+            >
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+              Media
+            </button>
+          </div>
+
           <button 
             type="submit" 
-            disabled={isSubmittingPost || !newPostContent.trim()}
+            disabled={isSubmittingPost || (!newPostContent.trim() && !selectedImage)}
             className="bg-slate-900 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition disabled:opacity-50"
           >
             {isSubmittingPost ? 'Publishing...' : 'Start a post 🚀'}
