@@ -4,11 +4,13 @@ import { API_BASE_URL } from '../config';
 import toast from 'react-hot-toast';
 import SkeletonPost from './SkeletonPost';
 import PostCard from './PostCard';
+import ExperienceModal from './ExperienceModal';
+import EducationModal from './EducationModal';
 
 export default function Profile() {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
-  const fileInputRef = useRef(null); // 👈 Hidden file explorer router link hook
+  const fileInputRef = useRef(null);
 
   const [user, setUser] = useState(null);
   const [userPosts, setUserPosts] = useState([]);
@@ -16,13 +18,25 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState('About'); 
   
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showExpModal, setShowExpModal] = useState(false);
-  const [showEduModal, setShowEduModal] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false); // 👈 Premium loading state spinner flag
+  const [expModalConfig, setExpModalConfig] = useState({ isOpen: false, editData: null });
+  const [eduModalConfig, setEduModalConfig] = useState({ isOpen: false, editData: null });
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   
   const [formData, setFormData] = useState({});
-  const [expData, setExpData] = useState({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
-  const [eduData, setEduData] = useState({ school: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
+
+  // 🔥 MASTER CHRONOLOGICAL SORT ENGINE (Descending Order: Latest on Top)
+  // Handles both Experience (startDate) and Education (startYear) schemas seamlessly
+  const sortChronologicallyDescending = (array = []) => {
+    return [...array].sort((a, b) => {
+      const getDateString = (obj) => obj.startDate || obj.startYear || '';
+      const getYear = (str) => {
+        if (!str) return 0;
+        const parts = str.split(' ');
+        return parseInt(parts[parts.length - 1]) || 0;
+      };
+      return getYear(getDateString(b)) - getYear(getDateString(a));
+    });
+  };
 
   const getInitials = (name) => {
     if (!name) return "U";
@@ -46,11 +60,7 @@ export default function Profile() {
         const resPosts = await fetch(`${API_BASE_URL}/api/posts`, { headers: { 'Authorization': `Bearer ${token}` } });
         if (resPosts.ok) {
           const allPosts = await resPosts.json();
-          
-          setUserPosts(allPosts.filter(post => 
-            String(post.user?._id || post.user) === String(data._id) && 
-            (!post.page || post.page === null || post.page === undefined)
-          ));
+          setUserPosts(allPosts.filter(post => String(post.user?._id || post.user) === String(data._id) && !post.page));
         }
       }
     } catch (err) {
@@ -67,48 +77,27 @@ export default function Profile() {
 
   useEffect(() => { fetchProfileData(); fetchSavedPosts(); }, []);
 
-  // 🔥 MULTIPART FORM DATA FILE DISPATCHER LAYER
   const handleAvatarFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    // File validation limits check
-    if (file.size > 5 * 1024 * 1024) {
-      return toast.error("File size must be under 5MB!");
-    }
+    if (file.size > 5 * 1024 * 1024) return toast.error("File size must be under 5MB!");
 
     const uploadFormData = new FormData();
     uploadFormData.append('avatar', file);
-
     setUploadingAvatar(true);
-    const loadToast = toast.loading("Uploading to Cloudinary registry...");
+    const loadToast = toast.loading("Uploading snapshot...");
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/update-avatar`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }, // Content-Type must be omitted for boundary generation
-        body: uploadFormData
-      });
-
+      const res = await fetch(`${API_BASE_URL}/api/auth/update-avatar`, { method: 'POST', headers: { 'Authorization': `Bearer ${token}` }, body: uploadFormData });
       const responseData = await res.json();
-
       if (res.ok) {
-        toast.success("Profile avatar updated! 📸", { id: loadToast });
+        toast.success("Avatar updated! 📸", { id: loadToast });
         setUser(prev => ({ ...prev, avatar: responseData.avatar }));
-      } else {
-        toast.error(responseData.message || "Failed to parse attachment stream", { id: loadToast });
       }
-    } catch (err) {
-      console.error("FRONTEND CATCH BLOCK TRACE:", err);
-      toast.error(`Upload Fail: ${err.message}`, { id: loadToast });
-    } finally {
-      setUploadingAvatar(false);
-    }
+    } catch (err) {} finally { setUploadingAvatar(false); }
   };
 
   const handleMainChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleEduChange = (e) => setEduData({ ...eduData, [e.target.name]: e.target.value });
-  const handleExpChange = (e) => setExpData({ ...expData, [e.target.name]: e.target.type === 'checkbox' ? e.target.checked : e.target.value });
 
   const saveToDatabase = async (updatedFields) => {
     try {
@@ -124,12 +113,8 @@ export default function Profile() {
         education: updatedFields.education !== undefined ? updatedFields.education : user.education,
       };
 
-      if (updatedFields.targetExams !== undefined && typeof updatedFields.targetExams === 'string') {
-        payload.targetExams = updatedFields.targetExams.split(',').map(e => e.trim()).filter(e => e);
-      } else if (formData.targetExams && typeof formData.targetExams === 'string') {
+      if (formData.targetExams && typeof formData.targetExams === 'string') {
         payload.targetExams = formData.targetExams.split(',').map(e => e.trim()).filter(e => e);
-      } else {
-        payload.targetExams = user.targetExams;
       }
 
       const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
@@ -139,373 +124,203 @@ export default function Profile() {
       });
       
       const responseData = await res.json();
-
       if (res.ok) {
         setUser(responseData); 
-        setShowEditModal(false); setShowExpModal(false); setShowEduModal(false);
-        setExpData({ title: '', company: '', location: '', startDate: '', endDate: '', current: false });
-        setEduData({ school: '', degree: '', fieldOfStudy: '', startYear: '', endYear: '' });
-        toast.success("Profile synced with cloud! ✨");
-        fetchProfileData(); 
-      } else {
-        toast.error(responseData.message || `Server Error`);
+        setShowEditModal(false);
+        setExpModalConfig({ isOpen: false, editData: null });
+        setEduModalConfig({ isOpen: false, editData: null });
+        toast.success("Profile synced! ✨");
       }
-    } catch (err) { 
-      toast.error(`Network Fault Encountered`); 
+    } catch (err) {}
+  };
+
+  const handleSaveExperience = (data) => {
+    let currentExpList = [...(user.experience || [])];
+    if (data._id) {
+      currentExpList = currentExpList.map(item => item._id === data._id ? data : item);
+    } else {
+      currentExpList.push(data);
     }
+    saveToDatabase({ experience: currentExpList });
+  };
+
+  const handleDeleteExperience = (id) => {
+    if (!window.confirm("Delete this workspace record?")) return;
+    saveToDatabase({ experience: (user.experience || []).filter(item => item._id !== id) });
+  };
+
+  const handleSaveEducation = (data) => {
+    let currentEduList = [...(user.education || [])];
+    if (data._id) {
+      currentEduList = currentEduList.map(item => item._id === data._id ? data : item);
+    } else {
+      currentEduList.push(data);
+    }
+    saveToDatabase({ education: currentEduList });
+  };
+
+  const handleDeleteEducation = (id) => {
+    if (!window.confirm("Delete this academic record?")) return;
+    saveToDatabase({ education: (user.education || []).filter(item => item._id !== id) });
   };
 
   const handleDelete = async (postId) => {
-    if (!window.confirm("Are you sure you want to delete this notice?")) return;
+    if (!window.confirm("Are you sure?")) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
       if (res.ok) {
-        setUserPosts((prev) => prev.filter(post => post._id !== postId));
-        setSavedPosts((prev) => prev.filter(post => post._id !== postId));
-        toast.success("Deleted successfully! 🗑️");
-      } else {
-        toast.error("Failed to delete post.");
+        setUserPosts((prev) => prev.filter(p => p._id !== postId));
+        toast.success("Deleted! 🗑️");
       }
-    } catch (err) {
-      toast.error("Network error.");
-    }
+    } catch (err) {}
   };
 
   const handleLike = async (postId) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        fetchProfileData();
-        fetchSavedPosts();
-      }
-    } catch (err) {
-      console.error(err);
-    }
+      const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) { fetchProfileData(); fetchSavedPosts(); }
+    } catch (err) {}
   };
 
-  const handleUpdateComments = (id, newComments) => {
-    const updateLoop = prev => prev.map(p => p._id === id ? { ...p, comments: newComments } : p);
-    setUserPosts(updateLoop);
-    setSavedPosts(updateLoop);
-  };
-
-  if (!user) {
-    return (
-      <div className="max-w-4xl mx-auto mt-6 px-4 pb-12 animate-pulse">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6 overflow-hidden">
-          <div className="h-32 bg-slate-200"></div>
-          <div className="px-6 pb-6 relative"><div className="w-32 h-32 bg-gray-300 rounded-full border-4 border-white absolute -top-16 left-6"></div></div>
-        </div>
-        <SkeletonPost />
-      </div>
-    );
-  }
+  if (!user) return <div className="max-w-3xl mx-auto mt-6 px-4 animate-pulse"><SkeletonPost /></div>;
 
   return (
     <div className="max-w-3xl mx-auto mt-4 space-y-4 pb-12 relative px-4 md:px-0 text-left">
-      
-      {/* 📁 HIDDEN NATIVE EXPLORER CONTROLLER */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleAvatarFileChange} 
-        accept="image/png, image/jpeg, image/jpg" 
-        className="hidden" 
-      />
+      <input type="file" ref={fileInputRef} onChange={handleAvatarFileChange} accept="image/png, image/jpeg, image/jpg" className="hidden" />
 
-      {/* 🛠... PROFILE INTRO EDIT MODAL ... */}
       {showEditModal && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100 max-h-[90vh] overflow-y-auto hide-scrollbar">
-            <h2 className="text-xl font-bold mb-4 text-slate-900">Edit Professional Info</h2>
+          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold mb-4">Edit Intro Info</h2>
             <form onSubmit={(e) => { e.preventDefault(); saveToDatabase(formData); }} className="space-y-4">
-              <input type="text" name="name" value={formData.name || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-slate-900 outline-none transition text-sm font-medium" placeholder="Full Name" required />
-              <input type="text" name="tagline" value={formData.tagline || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-slate-900 outline-none transition text-sm font-medium" placeholder="Headline Tagline" />
+              <input type="text" name="name" value={formData.name || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="Full Name" required />
+              <input type="text" name="tagline" value={formData.tagline || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="Headline Tagline" />
               <div className="flex gap-4">
-                <input type="text" name="jobTitle" value={formData.jobTitle || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Designation" />
-                <input type="text" name="department" value={formData.department || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Department / Organization" />
+                <input type="text" name="jobTitle" value={formData.jobTitle || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="Designation" />
+                <input type="text" name="department" value={formData.department || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="Organization" />
               </div>
               <div className="flex gap-4">
-                <input type="text" name="city" value={formData.city || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="City" />
-                <input type="text" name="state" value={formData.state || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="State" />
+                <input type="text" name="city" value={formData.city || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="City" />
+                <input type="text" name="state" value={formData.state || ''} onChange={handleMainChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="State" />
               </div>
-              <textarea name="bio" value={formData.bio || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none text-sm font-medium" placeholder="Write a summary..."></textarea>
-              <input type="text" name="targetExams" value={formData.targetExams || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Exams Tracking/Cleared" />
-              <div className="flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => setShowEditModal(false)} className="px-5 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl transition text-sm">Cancel</button>
-                <button type="submit" className="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-sm transition text-sm">Save Changes</button>
+              <textarea name="bio" value={formData.bio || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl h-24 outline-none text-sm font-medium text-slate-900" placeholder="Summary..."></textarea>
+              <input type="text" name="targetExams" value={formData.targetExams || ''} onChange={handleMainChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium text-slate-900" placeholder="Targeted Exams" />
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowEditModal(false)} className="px-5 py-2 text-slate-600 font-semibold rounded-xl text-sm">Cancel</button>
+                <button type="submit" className="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl text-sm">Save</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* 🛠... WORKSPACE EXPERIENCES MODAL ... */}
-      {showExpModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100">
-            <h2 className="text-xl font-bold mb-4 text-slate-900">Add Professional Role</h2>
-            <form onSubmit={(e) => { e.preventDefault(); saveToDatabase({ experience: [...(user.experience || []), expData] }); }} className="space-y-4">
-              <input type="text" name="title" value={expData.title} onChange={handleExpChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Designation" required />
-              <input type="text" name="company" value={expData.company} onChange={handleExpChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Department" required />
-              <input type="text" name="location" value={expData.location} onChange={handleExpChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Location" />
-              <div className="flex gap-4">
-                <input type="text" name="startDate" value={expData.startDate} onChange={handleExpChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Start Date" required />
-                {!expData.current && <input type="text" name="endDate" value={expData.endDate} onChange={handleExpChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="End Date" />}
-              </div>
-              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                <input type="checkbox" name="current" checked={expData.current} onChange={handleExpChange} className="w-4 h-4 rounded text-slate-900 focus:ring-0" /> I currently serve here
-              </label>
-              <div className="flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => setShowExpModal(false)} className="px-5 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl transition text-sm">Cancel</button>
-                <button type="submit" className="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-sm transition text-sm">Add Experience</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ExperienceModal isOpen={expModalConfig.isOpen} onClose={() => setExpModalConfig({ isOpen: false, editData: null })} onSave={handleSaveExperience} onDelete={handleDeleteExperience} editData={expModalConfig.editData} />
+      <EducationModal isOpen={eduModalConfig.isOpen} onClose={() => setEduModalConfig({ isOpen: false, editData: null })} onSave={handleSaveEducation} onDelete={handleDeleteEducation} editData={eduModalConfig.editData} />
 
-      {/* 🛠... EDUCATION METRICS MODAL ... */}
-      {showEduModal && (
-        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-lg border border-gray-100">
-            <h2 className="text-xl font-bold mb-4 text-slate-900">Add Academic Background</h2>
-            <form onSubmit={(e) => { e.preventDefault(); saveToDatabase({ education: [...(user.education || []), eduData] }); }} className="space-y-4">
-              <input type="text" name="school" value={eduData.school} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="School / College / University" required />
-              <input type="text" name="degree" value={eduData.degree} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Degree (e.g., B.Tech, MA)" required />
-              <input type="text" name="fieldOfStudy" value={eduData.fieldOfStudy} onChange={handleEduChange} className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Field of Study" />
-              <div className="flex gap-4">
-                <input type="text" name="startYear" value={eduData.startYear} onChange={handleEduChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="Start Year" />
-                <input type="text" name="endYear" value={eduData.endYear} onChange={handleEduChange} className="w-1/2 p-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm font-medium" placeholder="End Year" />
-              </div>
-              <div className="flex justify-end gap-3 mt-4">
-                <button type="button" onClick={() => setShowEduModal(false)} className="px-5 py-2 text-slate-600 font-semibold hover:bg-slate-100 rounded-xl transition text-sm">Cancel</button>
-                <button type="submit" className="px-5 py-2 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-sm transition text-sm">Add Education</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Profile Info Header Container */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn">
-        <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div> 
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div>
         <div className="px-6 pb-6 relative">
-          
-          {/* 🔥 HOVER OVERLAY CAMERA AVATAR LAYER */}
           <div className="absolute -top-16 left-6 z-10">
-            <div 
-              onClick={() => !uploadingAvatar && fileInputRef.current.click()}
-              className="group relative w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden uppercase cursor-pointer"
-            >
-              {uploadingAvatar ? (
-                // Smooth spinner tracker
-                <div className="absolute inset-0 bg-slate-900/70 flex flex-col items-center justify-center gap-1 text-[10px] font-black tracking-widest text-teal-400">
-                  <svg className="animate-spin h-5 w-5 text-teal-400" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  <span>SYNCING</span>
-                </div>
-              ) : (
+            <div onClick={() => !uploadingAvatar && fileInputRef.current.click()} className="group relative w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold overflow-hidden cursor-pointer">
+              {uploadingAvatar ? <span className="text-xs text-teal-400 animate-pulse">SYNCING</span> : (
                 <>
-                  {user.avatar ? <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover transition duration-200 group-hover:scale-105" /> : getInitials(user.name)}
-                  
-                  {/* Subtle Dark Glass Camera Backdrop Overlay */}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200 backdrop-blur-xs">
-                    <svg className="w-6 h-6 text-white drop-shadow-sm" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15a2.25 2.25 0 0 0 2.25-2.25V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z" />
-                    </svg>
-                  </div>
+                  {user.avatar ? <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" /> : getInitials(user.name)}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all duration-200"><svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15a2.25 2.25 0 0 0 2.25-2.25V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316Z" /></svg></div>
                 </>
               )}
-            </div> 
-            {user.verifiedAsOfficial && (
-              <div className="absolute bottom-2 right-2 bg-white rounded-full p-0.5 shadow-sm z-20">
-                <svg className="w-6 h-6 text-teal-600 fill-current" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
-                </svg>
-              </div>
-            )}
+            </div>
           </div>
-
           <div className="flex justify-end pt-4">
-            <button 
-              onClick={() => setShowEditModal(true)}
-              className="flex items-center gap-2 px-4 py-1.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-100 transition shadow-sm"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
-              Edit Profile
-            </button>
+            <button onClick={() => setShowEditModal(true)} className="px-4 py-1.5 bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-100 transition shadow-sm">Edit Profile</button>
           </div>
-          
           <div className="pt-2 mt-2">
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{user.name}</h1>
-              {user.verificationStatus === 'verified' ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-teal-600 text-white tracking-wider">Verified Official 🏛️</span>
-              ) : user.verificationStatus === 'pending' ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-amber-500 text-white tracking-wider">Review Pending ⏳</span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-slate-100 text-slate-600 tracking-wider">Network Member</span>
-              )}
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{user.name}</h1>
+            <div className="space-y-0.5 mb-3 mt-1">
+              <p className="text-slate-800 text-[15px] font-medium">{user.tagline || 'Active Network Member'}</p>
+              {(user.jobTitle || user.department) && <p className="text-slate-500 text-[13px]">{user.jobTitle} {user.department ? `at ${user.department}` : ''}</p>}
             </div>
-            
-            <p className="text-slate-700 text-[15px] font-medium mb-2">
-              {user.jobTitle ? `${user.jobTitle} ${user.department ? `at ${user.department}` : ''}` : user.tagline || 'Active Network Node'}
-            </p>
-            
-            <div className="flex items-center gap-1 text-sm text-slate-500 mb-6">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-              {user.city ? `${user.city}, ${user.state ? user.state + ', ' : ''}India` : 'India'}
-            </div>
-
-            <div className="flex items-center gap-6 border-t border-slate-100 pt-4 mt-2">
-              <div className="flex items-center gap-1.5 cursor-pointer hover:underline">
-                <span className="font-extrabold text-slate-900 text-[17px]">{user.followers?.length || 0}</span>
-                <span className="text-sm font-medium text-slate-500">Followers</span>
-              </div>
-              <div className="flex items-center gap-1.5 cursor-pointer hover:underline">
-                <span className="font-extrabold text-slate-900 text-[17px]">{user.following?.length || 0}</span>
-                <span className="text-sm font-medium text-slate-500">Following</span>
-              </div>
+            <div className="flex items-center gap-1 text-sm text-slate-500 mb-4">
+              {user.city ? `${user.city}, ${user.state}, India` : 'India'}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs Menu Selection Bar */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex p-1">
         {['About', 'Activity', 'Saved'].map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all text-center ${
-              activeTab === tab ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            {tab}
-          </button>
+          <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 text-sm font-bold rounded-lg ${activeTab === tab ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>{tab}</button>
         ))}
       </div>
 
-      {/* Active Tab View Routing Logic */}
       {activeTab === 'About' && (
-        <div className="space-y-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 relative">
-            <button onClick={() => setShowEditModal(true)} className="absolute top-4 right-5 text-slate-400 hover:text-slate-900 transition">
-               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-            </button>
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 relative">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Professional Summary</h2>
-            <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-              {user.bio || 'Add a professional summary...'}
-            </p>
+            <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">{user.bio || 'Add professional bio summaries...'}</p>
           </div>
 
-          {user.targetExams && user.targetExams.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Targeted Exams Dashboard</h2>
-               <div className="flex flex-wrap gap-2">
-                 {user.targetExams.map((exam, idx) => exam.trim() && (
-                   <span key={idx} className="bg-slate-100 text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-bold">
-                     🎯 {exam.trim()}
-                   </span>
-                 ))}
-               </div>
-            </div>
-          )}
-
-          {/* Experience Timeline Card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Experience History</h2>
-              <button onClick={() => setShowExpModal(true)} className="text-slate-900 text-sm font-bold bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">+ Add</button>
+              <button onClick={() => setExpModalConfig({ isOpen: true, editData: null })} className="text-slate-900 text-sm font-bold bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">+ Add</button>
             </div>
             <div className="space-y-5">
               {user.experience?.length > 0 ? (
-                user.experience.map((exp, idx) => (
-                  <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0">
-                    <div className="absolute w-2.5 h-2.5 bg-slate-900 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
-                    <h3 className="font-bold text-slate-900 text-sm">{exp.title}</h3>
-                    <p className="text-sm text-slate-700 font-medium mt-0.5">{exp.company} {exp.location ? `• ${exp.location}` : ''}</p>
-                    <p className="text-xs text-slate-500 mt-1">{exp.startDate} - {exp.current ? 'Present' : exp.endDate}</p>
+                sortChronologicallyDescending(user.experience).map((exp, idx) => (
+                  <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0 flex justify-between items-start group text-left">
+                    <div>
+                      <div className="absolute w-2.5 h-2.5 bg-slate-900 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
+                      <h3 className="font-bold text-slate-900 text-sm">{exp.title}</h3>
+                      <p className="text-sm text-slate-700 font-medium mt-0.5">{exp.company} {exp.location ? `• ${exp.location}` : ''}</p>
+                      <p className="text-xs text-slate-500 mt-1">{exp.startDate} - {exp.current ? 'Present' : exp.endDate}</p>
+                    </div>
+                    <button onClick={() => setExpModalConfig({ isOpen: true, editData: exp })} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-900 transition p-1 rounded-md hover:bg-slate-50">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
                   </div>
                 ))
               ) : <p className="text-sm text-slate-400 italic">No workspace records.</p>}
             </div>
           </div>
 
-          {/* Education Credentials Timeline */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Education Credentials</h2>
-              <button onClick={() => setShowEduModal(true)} className="text-slate-900 text-sm font-bold bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">+ Add</button>
+              <button onClick={() => setEduModalConfig({ isOpen: true, editData: null })} className="text-slate-900 text-sm font-bold bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition">+ Add</button>
             </div>
             <div className="space-y-5">
               {user.education?.length > 0 ? (
-                user.education.map((edu, idx) => (
-                  <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0">
-                    <div className="absolute w-2.5 h-2.5 bg-slate-500 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
-                    <h3 className="font-bold text-slate-900 text-sm">{edu.school}</h3>
-                    <p className="text-sm text-slate-700 font-medium mt-0.5">{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</p>
-                    <p className="text-xs text-slate-500 mt-1">{edu.startYear} - {edu.endYear}</p>
+                sortChronologicallyDescending(user.education).map((edu, idx) => (
+                  <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0 flex justify-between items-start group text-left">
+                    <div>
+                      <div className="absolute w-2.5 h-2.5 bg-slate-900 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
+                      <h3 className="font-bold text-slate-900 text-sm">{edu.school}</h3>
+                      <p className="text-sm text-slate-700 font-medium mt-0.5">{edu.degree} {edu.fieldOfStudy ? `in ${edu.fieldOfStudy}` : ''}</p>
+                      {/* 🔴 RENDER LAYER FIXED TO MATCH SCHEMA KEYS */}
+                      <p className="text-xs text-slate-500 mt-1">{edu.startYear} - {edu.endYear}</p>
+                    </div>
+                    <button onClick={() => setEduModalConfig({ isOpen: true, editData: edu })} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-900 transition p-1 rounded-md hover:bg-slate-50">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                    </button>
                   </div>
                 ))
               ) : <p className="text-sm text-slate-400 italic">No academic timelines added yet.</p>}
             </div>
           </div>
-
         </div>
       )}
 
       {activeTab === 'Activity' && (
-        <div className="space-y-4 animate-fadeIn">
-          {userPosts.length > 0 ? (
-            userPosts.map(post => (
-              <PostCard 
-                key={post._id} 
-                post={post} 
-                onDelete={handleDelete} 
-                onLike={handleLike}
-                onUpdateComments={handleUpdateComments}
-              />
-            ))
-          ) : (
-            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">No broadcasts shared from your stream yet.</p>
-            </div>
-          )}
+        <div className="space-y-4">
+          {userPosts.length > 0 ? userPosts.map(post => <PostCard key={post._id} post={post} onDelete={handleDelete} onLike={handleLike} />) : <p className="text-sm text-slate-400 italic text-center py-6">No shared streams.</p>}
         </div>
       )}
 
       {activeTab === 'Saved' && (
-        <div className="space-y-4 animate-fadeIn">
-          {savedPosts.length > 0 ? (
-            savedPosts.map(post => (
-              <PostCard 
-                key={post._id} 
-                post={post} 
-                onDelete={handleDelete} 
-                onLike={handleLike}
-                onUpdateComments={handleUpdateComments}
-              />
-            ))
-          ) : (
-            <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm text-slate-400 font-medium text-xs">
-              <span className="text-3xl block mb-2 opacity-50">🔖</span>
-              <p>No Saved Notices Bookmarked.</p>
-            </div>
-          )}
+        <div className="space-y-4">
+          {savedPosts.length > 0 ? savedPosts.map(post => <PostCard key={post._id} post={post} onDelete={handleDelete} onLike={handleLike} />) : <p className="text-sm text-slate-400 italic text-center py-6">No saved cards.</p>}
         </div>
       )}
-
     </div>
   );
 }
