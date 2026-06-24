@@ -20,7 +20,7 @@ router.get('/discover', protect, async (req, res) => {
   }
 });
 
-// 2. FOLLOW: 1-Way connection (Aspirants following Creators/Officials)
+// 2. FOLLOW / UNFOLLOW TOGGLE MATRIX FIXED! 🔄
 router.post('/follow/:id', protect, async (req, res) => {
   try {
     const currentUserId = req.user.id ? req.user.id : req.user;
@@ -35,25 +35,40 @@ router.post('/follow/:id', protect, async (req, res) => {
 
     if (!targetUser) return res.status(404).json({ msg: "User not found" });
 
-    if (currentUser.following.includes(targetUserId)) {
-      return res.status(400).json({ msg: "Already following this user" });
+    // Arrays initialization check safety lock
+    if (!currentUser.following) currentUser.following = [];
+    if (!targetUser.followers) targetUser.followers = [];
+
+    // Check if currently following
+    const isAlreadyFollowing = currentUser.following.map(id => id.toString()).includes(targetUserId.toString());
+
+    if (isAlreadyFollowing) {
+      // ❌ ALREADY FOLLOWING: Perform UNFOLLOW actions (Pull operation)
+      currentUser.following = currentUser.following.filter(id => id.toString() !== targetUserId.toString());
+      targetUser.followers = targetUser.followers.filter(id => id.toString() !== currentUserId.toString());
+
+      await currentUser.save();
+      await targetUser.save();
+
+      return res.json({ msg: "Successfully unfollowed user", following: currentUser.following });
+    } else {
+      // 🎯 NOT FOLLOWING YET: Perform FOLLOW actions (Push operation)
+      currentUser.following.push(targetUserId);
+      targetUser.followers.push(currentUserId);
+
+      await currentUser.save();
+      await targetUser.save();
+
+      // ✨ TRIGGER: Follow Notification Create Karo (Sirf follow karne par)
+      await Notification.create({
+        recipient: targetUserId,              // Jisko follow kiya
+        fromUser: currentUserId.toString(),   // Jisne follow kiya
+        type: 'follow',
+        message: 'started following you.'
+      });
+
+      return res.json({ msg: "Successfully followed user", following: currentUser.following });
     }
-
-    currentUser.following.push(targetUserId);
-    targetUser.followers.push(currentUserId);
-
-    await currentUser.save();
-    await targetUser.save();
-
-    // ✨ TRIGGER: Follow Notification Create Karo
-    await Notification.create({
-      recipient: targetUserId,              // Jisko follow kiya
-      fromUser: currentUserId.toString(),   // Jisne follow kiya
-      type: 'follow',
-      message: 'started following you.'
-    });
-
-    res.json({ msg: "Successfully followed user", following: currentUser.following });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server Error');

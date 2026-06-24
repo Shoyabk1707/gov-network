@@ -8,7 +8,7 @@ import Navbar from './components/Navbar';
 import Feed from './components/Feed';
 import Profile from './components/Profile';
 import Network from './components/Network';
-import UserProfile from './components/UserProfile'; // ✨ FIX: Changed from CreatorProfile to UserProfile
+import UserProfile from './components/UserProfile'; 
 import ManagePages from './components/ManagePages';
 import SinglePostView from './components/SinglePostView';
 import SearchResults from './components/SearchResults';
@@ -31,17 +31,14 @@ const AuthenticatedLayout = ({ children, handleLogout }) => {
       <Navbar handleLogout={handleLogout} />
       
       <main className="max-w-7xl mx-auto px-4 pt-6 pb-24 md:pb-6 grid grid-cols-1 md:grid-cols-12 gap-6">
-        {/* Left Sidebar: Hamesha 3 columns lega desktop par */}
         <div className="hidden md:block md:col-span-3">
           <LeftSidebar />
         </div>
 
-        {/* Dynamic Center Panel: Chat page par ye 9 columns lega (jaise Twitter X par hota hai) */}
         <div className={`col-span-1 ${isMessagesPage ? 'md:col-span-9' : 'md:col-span-6'}`}>
           {children}
         </div>
 
-        {/* Right Sidebar: Messages page aate hi completely hide ho jayega */}
         {!isMessagesPage && (
           <div className="hidden lg:block lg:col-span-3">
             <RightSidebar />
@@ -84,12 +81,13 @@ function App() {
         {/* --- AUTHENTICATED ROUTES --- */}
         <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network onViewProfile={(id) => navigate(`/creator/${id}`)} /></AuthenticatedLayout></ProtectedRoute>} />
+        
+        {/* 🚀 FIXED ROUTE INTERNALS */}
+        <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/user/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><UserProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
+        
         <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Notifications /></AuthenticatedLayout></ProtectedRoute>} />
-        // 📑 App.jsx ke Routes block ke andar ye line add karo:
         <Route path="/messages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Messages /></AuthenticatedLayout></ProtectedRoute>} />        
-        {/* ✨ FIX: Render UserProfileWrapper now instead of CreatorProfileWrapper */}
-        <Route path="/creator/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><UserProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
         
         <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
         <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
@@ -104,7 +102,7 @@ function App() {
   );
 }
 
-// ✨ FIX: Renamed Wrapper to match the new clean dynamic profile mapping
+// 🚀 WRAPPER MATCHING SYNCHRONIZATION
 const UserProfileWrapper = () => {
   const { userId } = useParams();
   const navigate = useNavigate();

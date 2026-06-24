@@ -1,21 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
 import SkeletonPost from './SkeletonPost';
 import toast from 'react-hot-toast';
-// 🔥 INTEGRATED UNIVERSAL PREMIUM COMPONENT LAYOUT
 import PostCard from './PostCard';
 
-// ==========================================
-// 🏛️ MAIN USER PROFILE EXTERNAL VIEW MODULE
-// ==========================================
 export default function UserProfile({ userId, onBack }) {
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
 
   const [data, setData] = useState(null);
+  const [myFollowing, setMyFollowing] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('About'); 
+
+  const sortChronologicallyDescending = (array = []) => {
+    return [...array].sort((a, b) => {
+      const getDateString = (obj) => obj.startDate || obj.startYear || '';
+      const getYear = (str) => {
+        if (!str) return 0;
+        const parts = str.split(' ');
+        return parseInt(parts[parts.length - 1]) || 0;
+      };
+      return getYear(getDateString(b)) - getYear(getDateString(a));
+    });
+  };
 
   const getInitials = (name) => {
     if (!name) return "U";
@@ -25,12 +34,22 @@ export default function UserProfile({ userId, onBack }) {
 
   const fetchCreatorData = async () => {
     try {
+      const resMe = await fetch(`${API_BASE_URL}/api/auth/me`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (resMe.ok) {
+        const meData = await resMe.json();
+        const cleanIds = (meData.following || []).map(f => (f._id || f).toString());
+        setMyFollowing(cleanIds);
+      }
+
       const res = await fetch(`${API_BASE_URL}/api/network/user/${userId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (res.ok) {
-        setData(await res.json());
+        const rawData = await res.json();
+        setData(rawData);
       } else {
         toast.error("Profile view unavailable.");
         onBack();
@@ -44,38 +63,84 @@ export default function UserProfile({ userId, onBack }) {
 
   useEffect(() => {
     if (userId) fetchCreatorData();
-  }, [userId, token]);
+  }, [userId]); 
 
-  // 💬 CHAT INITIATION TRIGGER ENGINE
-  const handleStartChat = async () => {
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/chat/start`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({ recipientId: userId })
-    });
+  const sortedExperience = useMemo(() => {
+    return data?.profile?.experience ? sortChronologicallyDescending(data.profile.experience) : [];
+  }, [data?.profile?.experience]);
 
-    const conversationData = await res.json();
+  const sortedEducation = useMemo(() => {
+    return data?.profile?.education ? sortChronologicallyDescending(data.profile.education) : [];
+  }, [data?.profile?.education]);
 
-    if (res.ok && conversationData) {
-      toast.success("Opening secure stream... 💬");
-      // Double check backend key pattern (_id ya id)
-      const chatRoomId = conversationData._id || conversationData.id;
+  const handleFollowToggle = async () => {
+    const isCurrentlyFollowing = myFollowing.includes(userId.toString());
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/network/follow/${userId}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
       
-      navigate('/messages', { state: { autoSelectChatId: chatRoomId } }); 
-    } else {
-      toast.error(conversationData.message || "Failed to initiate chat bridge.");
-    }
-  } catch (err) {
-    console.error("Chat navigation crash logs:", err);
-    toast.error("Navigation routing layout fault.");
-  }
-};
+      if (res.ok) {
+        const resData = await res.json();
+        
+        if (resData.following) {
+          const updatedIds = resData.following.map(uid => (uid._id || uid).toString());
+          setMyFollowing(updatedIds);
+        } else {
+          setMyFollowing(prev => 
+            isCurrentlyFollowing ? prev.filter(uid => uid !== userId.toString()) : [...prev, userId.toString()]
+          );
+        }
 
-  // 🔥 INTERACTION ENGINE PIPELINES SYNCHRONIZATION
+        setData(prev => {
+          if (!prev || !prev.profile) return prev;
+          let newFollowers = [...(prev.profile.followers || [])];
+          if (isCurrentlyFollowing) {
+            newFollowers = newFollowers.filter(f => (f._id || f).toString() !== userId.toString());
+           {/*   toast.success("Unfollowed member node."); */}
+          } else {
+            newFollowers.push(userId);
+           {/* toast.success("Following updates live! 📢"); */}
+          }
+          return { 
+            ...prev, 
+            profile: { 
+              ...prev.profile, 
+              followers: newFollowers
+            } 
+          };
+        });
+      }
+    } catch (err) {
+      toast.error("Action pipeline sync broke down.");
+    }
+  };
+
+  const handleStartChat = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/chat/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ recipientId: userId })
+      });
+
+      const conversationData = await res.json();
+      if (res.ok && conversationData) {
+        toast.success("Opening secure stream... 💬");
+        const chatRoomId = conversationData._id || conversationData.id;
+        navigate('/messages', { state: { autoSelectChatId: chatRoomId } }); 
+      } else {
+        toast.error(conversationData.message || "Failed to initiate chat bridge.");
+      }
+    } catch (err) {
+      toast.error("Navigation routing layout fault.");
+    }
+  };
+
   const handleLike = async (postId) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/like`, {
@@ -83,7 +148,13 @@ export default function UserProfile({ userId, onBack }) {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
-        fetchCreatorData(); // Re-fetch target user node metric states
+        setData(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            posts: prev.posts.map(p => p._id === postId ? { ...p, likes: p.likes?.includes(userId) ? p.likes.filter(id => id !== userId) : [...(p.likes || []), userId] } : p)
+          };
+        });
       }
     } catch (err) {
       console.error(err);
@@ -99,7 +170,10 @@ export default function UserProfile({ userId, onBack }) {
       });
       if (res.ok) {
         toast.success("Deleted successfully! 🗑️");
-        fetchCreatorData();
+        setData(prev => {
+          if (!prev) return prev;
+          return { ...prev, posts: prev.posts.filter(p => p._id !== postId) };
+        });
       }
     } catch (err) {
       toast.error("Network fault processing delete.");
@@ -130,6 +204,7 @@ export default function UserProfile({ userId, onBack }) {
 
   const { profile, posts } = data;
   const tabs = ['About', 'Activity'];
+  const checkIsFollowingProfile = myFollowing.includes(profile._id.toString());
 
   return (
     <div className="max-w-3xl mx-auto mt-4 space-y-4 pb-12 relative px-4 md:px-0 text-left">
@@ -138,91 +213,87 @@ export default function UserProfile({ userId, onBack }) {
         ← Back to Network
       </button>
 
-      {/* 🖼️ HERO CELL HEADER LAYER */}
+      {/* 🖼️ PROFILE MASTER CARD */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden animate-fadeIn">
         <div className="h-32 bg-gradient-to-r from-slate-800 via-slate-900 to-black relative"></div> 
         
         <div className="px-6 pb-6 relative">
           
-          {/* ACTION BUTTONS GRID SYSTEM */}
-          <div className="absolute top-4 right-6 flex items-center gap-2 z-20">
-            <button className="px-5 py-1.5 bg-slate-100 text-slate-800 border border-slate-200 rounded-lg text-sm font-bold hover:bg-slate-200 transition shadow-sm">
-              Follow
-            </button>
-
-            {/* ✨ INJECTED CHAT INTEGRATION BUTTON */}
-            <button 
-              onClick={handleStartChat}
-              className="px-4 py-1.5 bg-slate-900 text-white border border-slate-900 rounded-lg text-sm font-bold hover:bg-slate-800 transition shadow-sm flex items-center gap-1.5"
-            >
-              💬 Message
-            </button>
-            
-            {profile.verifiedAsOfficial && (
-              <button className="px-4 py-1.5 bg-slate-50 border border-slate-200 text-slate-800 rounded-lg text-sm font-bold hover:bg-slate-100 transition flex items-center gap-1.5 shadow-sm">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg>
-                Request Guidance
-              </button>
-            )}
-          </div>
-
           <div className="absolute -top-16 left-6 z-10">
-            <div className="w-32 h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden">
+            <div className="w-28 h-28 md:w-32 md:h-32 bg-slate-900 text-white rounded-full border-4 border-white shadow-md flex items-center justify-center text-4xl font-extrabold tracking-wide overflow-hidden">
               {profile.avatar ? <img src={profile.avatar} alt="Avatar" className="w-full h-full object-cover" /> : getInitials(profile.name)}
             </div> 
             
-            {profile.verifiedAsOfficial && (
-              <div className="absolute bottom-2 right-2 bg-white rounded-full p-0.5 shadow-sm">
-                <svg className="w-6 h-6 text-teal-600 fill-current" viewBox="0 0 20 20">
+            {profile.role === 'official' && (
+              <div className="absolute bottom-1 right-1 bg-white rounded-full p-0.5 shadow-sm">
+                <svg className="w-5 h-5 text-teal-600 fill-current" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                 </svg>
               </div>
             )}
           </div>
           
-          <div className="pt-20 mt-2">
-            <div className="flex flex-wrap items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight">{profile.name}</h1>
-              
-              {profile.verificationStatus === 'verified' ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-teal-600 text-white tracking-wider">Verified Official 🏛️</span>
-              ) : profile.verificationStatus === 'pending' ? (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-amber-500 text-white tracking-wider">Review Pending ⏳</span>
-              ) : (
-                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase bg-slate-100 text-slate-600 tracking-wider">Network Member</span>
+          {/* Main Info Text Layer */}
+          <div className="pt-14 md:pt-20 mt-2 flex flex-col">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 tracking-tight">{profile.name}</h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-slate-100 text-slate-600 tracking-wider">
+                {profile.role === 'official' ? 'Official 🏛️' : profile.role === 'creator' ? 'Creator 🎓' : 'Aspirant 🎯'}
+              </span>
+            </div>
+            
+            <div className="space-y-0.5 mb-1.5">
+              <p className="text-slate-800 text-sm md:text-[15px] font-normal leading-normal">{profile.tagline || 'Active Network Node'}</p>
+              {(profile.jobTitle || profile.department) && (
+                <p className="text-slate-500 text-xs md:text-[13px]">{profile.jobTitle} {profile.department ? `at ${profile.department}` : ''}</p>
               )}
             </div>
             
-            <p className="text-slate-700 text-[15px] font-medium mb-2">
-              {profile.jobTitle ? `${profile.jobTitle} ${profile.department ? `at ${profile.department}` : ''}` : profile.tagline || 'Active Network Member'}
-            </p>
-            
-            <div className="flex items-center gap-1 text-sm text-slate-500 mb-6">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            <div className="flex items-center gap-1 text-xs md:text-sm text-slate-400 mb-3">
               {profile.city ? `${profile.city}, ${profile.state ? profile.state + ', ' : ''}India` : 'India'}
             </div>
 
-            <div className="flex items-center gap-6 border-t border-slate-100 pt-4 mt-2">
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-slate-900 text-[17px]">{profile.followers?.length || 0}</span>
-                <span className="text-sm font-medium text-slate-500">Followers</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-slate-900 text-[17px]">{profile.following?.length || 0}</span>
-                <span className="text-sm font-medium text-slate-500">Following</span>
-              </div>
+            {/* 👥 FIXED LINKEDIN STYLE COMPACT COUNTER */}
+            <div className="flex items-center gap-1 text-xs md:text-sm mb-4">
+              <span className="font-bold text-slate-800">{profile.followers?.length || 0}</span>
+              <span className="text-slate-500 font-medium mr-3">followers</span>
+              <span className="font-bold text-slate-800">{profile.following?.length || 0}</span>
+              <span className="text-slate-500 font-medium">following</span>
             </div>
+
+            {/* 🚀 FIXED RESPONSIVE BUTTON FRAME (Followers Ke Niche) */}
+            <div className="flex flex-row items-center gap-2 pt-0.5 z-20 w-full sm:max-w-xs">
+              <button 
+                onClick={handleFollowToggle}
+                className={`flex-1 px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1 ${
+                  checkIsFollowingProfile 
+                    ? 'bg-white border border-slate-400  text-slate-600 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-700' 
+                    : 'bg-slate-800 text-white border border-slate-900 hover:bg-slate-900  hover:text-white '
+                }`}
+              >
+                {checkIsFollowingProfile ? 'Following' : 'Follow'}
+              </button>
+
+              <button 
+                onClick={handleStartChat}
+                className="flex-1 px-4 py-2 bg-white text-slate-700 border border-slate-400 rounded-xl text-sm font-bold hover:border-slate-500 hover:bg-slate-100 transition shadow-sm flex items-center justify-center gap-1.5 min-h-[38px]"
+              >
+                Message
+              </button>
+            </div>
+
           </div>
+
         </div>
       </div>
 
-      {/* 📁 TABS CONTROLLER CONTAINER */}
+      {/* Tabs Selection */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm flex p-1">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all text-center ${
+            className={`flex-1 py-2 md:py-2.5 text-xs md:text-sm font-bold rounded-lg transition-all text-center ${
               activeTab === tab ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
@@ -231,10 +302,10 @@ export default function UserProfile({ userId, onBack }) {
         ))}
       </div>
 
-      {/* About Section Layout */}
+      {/* Content Panels */}
       {activeTab === 'About' && (
         <div className="space-y-4 animate-fadeIn">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 md:p-6">
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Professional Summary</h2>
             <p className="text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
               {profile.bio || 'No professional summary provided yet.'}
@@ -242,11 +313,11 @@ export default function UserProfile({ userId, onBack }) {
           </div>
 
           {profile.targetExams && profile.targetExams.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 md:p-6">
                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Targeted Exams</h2>
                <div className="flex flex-wrap gap-2">
                  {profile.targetExams.map((exam, idx) => exam.trim() && (
-                   <span key={idx} className="bg-slate-100 text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg text-sm font-bold">
+                   <span key={idx} className="bg-slate-100 text-slate-800 border border-slate-200 px-3 py-1.5 rounded-lg text-xs md:text-sm font-bold">
                      🎯 {exam.trim()}
                    </span>
                  ))}
@@ -254,11 +325,11 @@ export default function UserProfile({ userId, onBack }) {
             </div>
           )}
 
-          {profile.experience?.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          {sortedExperience && sortedExperience.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 md:p-6">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Experience History</h2>
               <div className="space-y-5">
-                {profile.experience.map((exp, idx) => (
+                {sortedExperience.map((exp, idx) => (
                   <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0">
                     <div className="absolute w-2.5 h-2.5 bg-slate-900 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
                     <h3 className="font-bold text-slate-900 text-sm">{exp.title}</h3>
@@ -270,11 +341,11 @@ export default function UserProfile({ userId, onBack }) {
             </div>
           )}
 
-          {profile.education?.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+          {sortedEducation && sortedEducation.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 md:p-6">
               <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-5">Education Credentials</h2>
               <div className="space-y-5">
-                {profile.education.map((edu, idx) => (
+                {sortedEducation.map((edu, idx) => (
                   <div key={idx} className="relative pl-4 border-l-2 border-slate-200 last:border-0">
                     <div className="absolute w-2.5 h-2.5 bg-slate-500 rounded-full -left-[6px] top-1.5 ring-4 ring-white"></div>
                     <h3 className="font-bold text-slate-900 text-sm">{edu.school}</h3>
@@ -288,12 +359,11 @@ export default function UserProfile({ userId, onBack }) {
         </div>
       )}
 
-      {/* 🔥 REFACTORED ACTIVITY TAB */}
       {activeTab === 'Activity' && (
         <div className="space-y-4 animate-fadeIn">
-          {posts && posts.filter(post => !post.page || post.page === null || post.page === undefined).length > 0 ? (
+          {posts && posts.filter(post => !post.page).length > 0 ? (
             posts
-              .filter(post => !post.page || post.page === null || post.page === undefined)
+              .filter(post => !post.page)
               .map(post => (
                 <PostCard 
                   key={post._id} 
@@ -305,7 +375,7 @@ export default function UserProfile({ userId, onBack }) {
               ))
           ) : (
             <div className="text-center py-12 bg-white rounded-2xl border border-gray-200 shadow-sm">
-              <p className="text-sm font-medium text-slate-500">No activity or broadcasts posted from this stream yet.</p>
+              <p className="text-sm font-medium text-slate-500">No activity posted yet.</p>
             </div>
           )}
         </div>

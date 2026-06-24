@@ -8,7 +8,7 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   const [commentText, setCommentText] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
-  const [isZoomed, setIsZoomed] = useState(false); // 👈 Zoom Overlay modal portal state
+  const [isZoomed, setIsZoomed] = useState(false); 
   
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
@@ -43,7 +43,7 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   const hasLiked = post.likes && post.likes.some(id => String(id) === String(currentUserId));
 
   useEffect(() => {
-    if (window.location.pathname.includes('profile')) {
+    if (window.location.pathname.includes('profile') && !window.location.pathname.includes('user')) {
       setHasSaved(true);
     } else {
       const savedRegistry = JSON.parse(localStorage.getItem(`saved_node_${currentUserId}`)) || {};
@@ -87,12 +87,10 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         
         localStorage.setItem(`saved_node_${currentUserId}`, JSON.stringify(savedRegistry));
         setHasSaved(nextState);
-
-        if (typeof onLike === 'function') {
-          onLike(post._id);
-        }
+        
+        // 🔥 REMOVED THE WRONG onLike TRiGGER FROM HERE TO STOP THE RENDERING LOOP FLAG
       } else {
-        toast.error(data.message);
+        toast.error(data.message || "Could not complete save action.");
       }
     } catch (err) {
       toast.error("Error processing save request.");
@@ -110,7 +108,9 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
       });
       if (res.ok) {
         const updatedComments = await res.json();
-        onUpdateComments(post._id, updatedComments);
+        if (typeof onUpdateComments === 'function') {
+          onUpdateComments(post._id, updatedComments);
+        }
         setCommentText('');
         toast.success("Comment added! 💬");
       }
@@ -175,7 +175,6 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         </p>
       </div>
 
-      {/* 📸 FIXED IMAGE BOX & LINKEDIN ZOOM HANDLER MODULE */}
       {post.image && (
         <div className="px-5 pb-4" onClick={(e) => e.stopPropagation()}>
           <div 
@@ -190,13 +189,11 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
             />
           </div>
 
-          {/* 🔴 OVERLAY PORTAL SCREEN (LinkedIn/X Context-Preserving Zoom Box) */}
           {isZoomed && (
             <div 
               className="fixed inset-0 bg-black/90 z-[9999] flex flex-col justify-center items-center p-4 cursor-zoom-out select-none"
               onClick={() => setIsZoomed(false)}
             >
-              {/* Floating Top Control Panel */}
               <div className="absolute top-4 right-4 flex items-center gap-3">
                 <button 
                   onClick={() => setIsZoomed(false)}
@@ -208,14 +205,12 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
                 </button>
               </div>
 
-              {/* Master Full-Resolution Canvas render */}
               <img 
                 src={post.image} 
                 alt="Enlarged visualization viewport" 
                 className="max-w-full max-h-[85vh] md:max-h-[90vh] object-contain rounded-lg shadow-2xl"
               />
 
-              {/* Text contextual banner */}
               {post.content && (
                 <p className="text-gray-200 text-xs font-semibold mt-4 max-w-2xl text-center line-clamp-2 bg-slate-900/80 px-4 py-2.5 rounded-xl border border-slate-700/50 backdrop-blur-md">
                   {post.content}
@@ -231,7 +226,7 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         onClick={(e) => e.stopPropagation()}
       >
         <button 
-          onClick={() => onLike(post._id)} 
+          onClick={() => typeof onLike === 'function' && onLike(post._id)} 
           className={`flex items-center gap-1.5 transition-colors duration-200 ${
             hasLiked ? 'text-red-500 font-bold' : 'hover:text-red-500 text-slate-500'
           }`}
