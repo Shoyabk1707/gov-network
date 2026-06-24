@@ -60,7 +60,6 @@ export default function PostComposer({ onPostSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Manual Check: text aur image dono me se kuch ek hona zaruri hai
     if (!content.trim() && !selectedImage) {
       return toast.error("Please add some text or an image to post!");
     }
@@ -79,12 +78,21 @@ export default function PostComposer({ onPostSuccess }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts`, {
         method: 'POST',
+        mode: 'cors',
         headers: { 
           'Authorization': `Bearer ${token}`
         },
         body: formData 
       });
       
+      // ✨ SAFE PARSING LAYER: HTML dump response text leak checker
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const rawTextError = await res.text();
+        console.error("🔴 SERVER HTML LEAK TRACE:", rawTextError);
+        throw new Error("Server did not return JSON response.");
+      }
+
       const responseData = await res.json();
 
       if (res.ok) {

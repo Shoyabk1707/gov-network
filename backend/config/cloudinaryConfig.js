@@ -14,7 +14,8 @@ const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
     folder: 'gov_network_media', // Cloudinary par kis folder me store hoga
-    allowed_formats: ['jpg', 'png', 'jpeg', 'pdf'], // Dynamic formats lock
+    allowed_formats: ['jpg', 'png', 'jpeg', 'pdf', 'webp', 'gif',], // Dynamic formats lock
+    transformation: [{ width: 1024, quality: 'auto' }],
     resource_type: 'auto' // Images aur documents dono auto-detect ho sakein
   }
 });

@@ -13,10 +13,10 @@ function SinglePostView() {
   const [error, setError] = useState(null);
   const [commentText, setCommentText] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false); // 👈 Enlarged dynamic viewport modal state
   
   const token = localStorage.getItem('token');
 
-  // Token decode layer
   let currentUserId = null;
   try {
     if (token) {
@@ -31,18 +31,11 @@ function SinglePostView() {
 
   const fetchSinglePost = async () => {
     try {
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
       const res = await fetch(`${API_BASE_URL}/api/posts/${id}`, { headers });
       
-      if (!res.ok) {
-        throw new Error("Notice not found or deleted by admin.");
-      }
-      const data = await res.json();
-      setPost(data);
+      if (!res.ok) throw new Error("Notice not found or deleted by admin.");
+      setPost(await res.json());
     } catch (err) {
       console.error("Single Post Error:", err);
       setError(err.message);
@@ -52,9 +45,7 @@ function SinglePostView() {
   };
 
   useEffect(() => {
-    if (id) {
-      fetchSinglePost();
-    }
+    if (id) fetchSinglePost();
   }, [id, token]);
 
   if (loading) {
@@ -76,7 +67,6 @@ function SinglePostView() {
     );
   }
 
-  // ✨ SECURE OBJECT EXTRACTION: Safeguard logic for Page vs User post mappings
   const isPagePost = post.page !== null && post.page !== undefined;
   const authorName = isPagePost ? post.page?.name : post.user?.name || "User Node";
   const authorSubtext = isPagePost 
@@ -89,27 +79,14 @@ function SinglePostView() {
     return clean.length >= 2 ? (clean[0][0] + clean[1][0]).toUpperCase() : clean[0][0].toUpperCase();
   };
 
-  // 🔥 FIXES USER ROUTING REDIRECTIONS ALWAYS
   const handleAuthorClick = () => {
     if (isPagePost) {
       const pageId = post.page?._id || post.page;
       if (pageId) navigate(`/page/${pageId}`);
     } else {
-      // Extract target string ID safely from populated object or direct field
       const authorId = post.user?._id || post.user;
-      const parsedCurrentUserId = String(currentUserId || '');
-      const parsedAuthorId = String(authorId || '');
-
-      if (!parsedAuthorId) {
-        toast.error("User identity not found.");
-        return;
-      }
-
-      if (parsedAuthorId === parsedCurrentUserId) {
-        navigate('/profile');
-      } else {
-        navigate(`/user/${parsedAuthorId}`);
-      }
+      if (!authorId) return toast.error("User identity not found.");
+      navigate(String(authorId) === String(currentUserId || '') ? '/profile' : `/user/${authorId}`);
     }
   };
 
@@ -119,9 +96,7 @@ function SinglePostView() {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (res.ok) {
-        fetchSinglePost();
-      }
+      if (res.ok) fetchSinglePost();
     } catch (err) {
       console.error(err);
     }
@@ -145,17 +120,14 @@ function SinglePostView() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/posts/${id}/comment`, {
         method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
         body: JSON.stringify({ text: commentText.trim() })
       });
 
       if (res.ok) {
-        const updatedCommentsArray = await res.json();
-        setPost(prev => ({ ...prev, comments: updatedCommentsArray }));
-        commentText('');
+        const jsonComments = await res.json(); // 👈 Pehle hi data nikal lo safe tarike se
+        setPost(prev => ({ ...prev, comments: jsonComments })); // 👈 Ab state me daal do bina syntax break kiye
+        setCommentText('');
         toast.success("Comment added! 💬");
       } else {
         toast.error("Failed to submit reply.");
@@ -185,15 +157,20 @@ function SinglePostView() {
 
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden space-y-0">
         
+        {/* Author Metadata Panel */}
         <div className="p-5 pb-3 flex justify-between items-start gap-4">
           <div className="flex items-center gap-3">
             <div 
               onClick={handleAuthorClick}
-              className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shrink-0 cursor-pointer ${
-                isPagePost ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-800 border border-slate-200'
+              className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shrink-0 cursor-pointer overflow-hidden border ${
+                isPagePost ? 'bg-slate-900 text-white border-slate-950' : 'bg-slate-100 text-slate-800 border-slate-200'
               }`}
             >
-              {getAvatarInitials(authorName)}
+              {!isPagePost && post.user?.avatar ? (
+                <img src={post.user.avatar} alt={authorName} className="w-full h-full object-cover" />
+              ) : (
+                getAvatarInitials(authorName)
+              )}
             </div>
             
             <div>
@@ -215,12 +192,61 @@ function SinglePostView() {
           </div>
         </div>
 
-        <div className="px-5 pb-5">
+        {/* Core Text Body */}
+        <div className="px-5 pb-4">
           <p className="text-slate-800 text-[15px] font-normal whitespace-pre-wrap leading-relaxed">
             {post.content}
           </p>
         </div>
 
+        {/* 📸 INSULATION ENHANCED ASPECT FRAME & LINKEDIN PORTAL OVERLAY */}
+        {post.image && (
+          <div className="px-5 pb-5">
+            <div 
+              onClick={() => setIsZoomed(true)}
+              className="rounded-xl overflow-hidden border border-gray-150 bg-slate-50 max-h-[480px] flex items-center justify-center cursor-zoom-in group relative"
+            >
+              <img 
+                src={post.image} 
+                alt="Post media frame" 
+                className="w-full h-auto max-h-[480px] object-contain transition-transform duration-200 group-hover:scale-[1.005]"
+              />
+            </div>
+
+            {/* 🔴 FULLSCREEN ZOOM CANVAS OVERLAY */}
+            {isZoomed && (
+              <div 
+                className="fixed inset-0 bg-black/90 z-[9999] flex flex-col justify-center items-center p-4 cursor-zoom-out select-none"
+                onClick={() => setIsZoomed(false)}
+              >
+                <div className="absolute top-4 right-4">
+                  <button 
+                    onClick={() => setIsZoomed(false)}
+                    className="text-white bg-slate-800/60 hover:bg-slate-800 p-2.5 rounded-full transition-all border border-white/10"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <img 
+                  src={post.image} 
+                  alt="Enlarged context canvas" 
+                  className="max-w-full max-h-[85vh] md:max-h-[90vh] object-contain rounded-lg shadow-2xl"
+                />
+
+                {post.content && (
+                  <p className="text-gray-200 text-xs font-semibold mt-4 max-w-2xl text-center line-clamp-2 bg-slate-900/80 px-4 py-2.5 rounded-xl border border-slate-700/50 backdrop-blur-md">
+                    {post.content}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action Controls Frame */}
         <div className="flex items-center gap-6 px-5 py-3 border-t border-gray-100 bg-slate-50/50 text-slate-500 font-medium text-xs">
           <button 
             onClick={handleLike} 
@@ -243,6 +269,7 @@ function SinglePostView() {
           </button>
         </div>
 
+        {/* Discussion Stream */}
         <div className="p-5 border-t border-slate-100 bg-slate-50/40 space-y-4">
           <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
             Discussion ({post.comments?.length || 0})
@@ -253,9 +280,9 @@ function SinglePostView() {
               post.comments.map((comment) => (
                 <div key={comment._id} className="bg-white p-3 rounded-xl border border-slate-150 text-xs shadow-sm">
                   <div className="flex justify-between items-center mb-1">
-                    <span className="font-bold text-slate-900">
+                    <span className="font-bold text-slate-900 flex items-center gap-1">
                       {comment.user?.name || "Anonymous User"} 
-                      <span className="text-slate-400 font-medium ml-1">
+                      <span className="text-slate-400 font-medium text-[11px]">
                         ({comment.user?.jobTitle || "Aspirant"})
                       </span>
                     </span>

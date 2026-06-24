@@ -7,11 +7,12 @@ const createPost = async (req, res) => {
     const { content, category, pageId, postType } = req.body;
     const currentUserId = req.user?._id || req.user?.id || req.user;
 
-    if (!content?.trim()) {
-      return res.status(400).json({ message: 'Content is required to create a post' });
+    // ✨ FIXED VALIDATION: Agar text bhi nahi hai aur image bhi nahi hai, tabhi block karo
+    if (!content?.trim() && !req.file) {
+      return res.status(400).json({ message: 'Either text content or an image is required to create a post' });
     }
 
-    // 📸 INDUSTRIAL EXTRACTOR: Check karo agar cloud storage link ready hai
+    // 📸 INDUSTRIAL EXTRACTOR: Cloudinary link parse buffer
     let imageUrl = null;
     if (req.file) {
       imageUrl = req.file.path; // Cloudinary secure string URL mapping
@@ -19,14 +20,14 @@ const createPost = async (req, res) => {
 
     const newPost = await Post.create({
       user: currentUserId.toString(),
-      content,
+      content: content?.trim() || "", // 👈 Safe fallback agar user ne text na likha ho
       category: postType || category || 'General',
       page: pageId || null,
-      image: imageUrl // 👈 Injected file string registry hook
+      image: imageUrl
     });
 
     const populatedPost = await Post.findById(newPost._id)
-      .populate('user', 'name role jobTitle department avatar') // Added avatar if needed
+      .populate('user', 'name role jobTitle department avatar')
       .populate('page', 'name category');
 
     res.status(201).json(populatedPost);

@@ -8,6 +8,7 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
   const [commentText, setCommentText] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [hasSaved, setHasSaved] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false); // 👈 Zoom Overlay modal portal state
   
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
@@ -126,7 +127,6 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
       <div className="p-5 space-y-3">
         <div className="flex justify-between items-start gap-4">
           <div className="flex items-center gap-3">
-            {/* ✨ UPDATED: User Profile Avatar Dynamic Image / Initials Selector */}
             <div className={`w-11 h-11 rounded-full flex items-center justify-center font-bold text-sm tracking-wide shrink-0 overflow-hidden border ${
               isPagePost ? 'bg-slate-900 text-white border-slate-950' : 'bg-slate-100 text-slate-800 border-slate-200'
             }`}>
@@ -175,17 +175,54 @@ export default function PostCard({ post, onDelete, onLike, onUpdateComments }) {
         </p>
       </div>
 
-      {/* 📸 Attachment Image Showcase */}
+      {/* 📸 FIXED IMAGE BOX & LINKEDIN ZOOM HANDLER MODULE */}
       {post.image && (
-        <div className="px-5 pb-4">
-          <div className="rounded-xl overflow-hidden border border-gray-100 bg-gray-50 max-h-[420px] flex items-center justify-center">
+        <div className="px-5 pb-4" onClick={(e) => e.stopPropagation()}>
+          <div 
+            onClick={() => setIsZoomed(true)}
+            className="rounded-xl overflow-hidden border border-gray-100 bg-slate-50 max-h-[450px] flex items-center justify-center cursor-zoom-in group relative"
+          >
             <img 
               src={post.image} 
               alt="Post attachment" 
-              className="w-full h-full object-cover max-h-[420px]"
+              className="w-full h-auto max-h-[450px] object-contain transition-transform duration-200 group-hover:scale-[1.005]"
               loading="lazy"
             />
           </div>
+
+          {/* 🔴 OVERLAY PORTAL SCREEN (LinkedIn/X Context-Preserving Zoom Box) */}
+          {isZoomed && (
+            <div 
+              className="fixed inset-0 bg-black/90 z-[9999] flex flex-col justify-center items-center p-4 cursor-zoom-out select-none"
+              onClick={() => setIsZoomed(false)}
+            >
+              {/* Floating Top Control Panel */}
+              <div className="absolute top-4 right-4 flex items-center gap-3">
+                <button 
+                  onClick={() => setIsZoomed(false)}
+                  className="text-white bg-slate-800/60 hover:bg-slate-800 p-2.5 rounded-full transition-all border border-white/10"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Master Full-Resolution Canvas render */}
+              <img 
+                src={post.image} 
+                alt="Enlarged visualization viewport" 
+                className="max-w-full max-h-[85vh] md:max-h-[90vh] object-contain rounded-lg shadow-2xl"
+              />
+
+              {/* Text contextual banner */}
+              {post.content && (
+                <p className="text-gray-200 text-xs font-semibold mt-4 max-w-2xl text-center line-clamp-2 bg-slate-900/80 px-4 py-2.5 rounded-xl border border-slate-700/50 backdrop-blur-md">
+                  {post.content}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
       

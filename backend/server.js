@@ -20,7 +20,7 @@ const allowedOrigins = [
   'https://gov-network-1m0wj5zq7-gov-network-s-projects.vercel.app' // 👈 Fixed trailing slash
 ];
 
-app.use(cors({
+const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     
@@ -38,7 +38,11 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // 👈 Added PATCH & OPTIONS for binary/pre-flight handshakes
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'] // 👈 Extended for multipart boundary support
-}));
+};
+
+// 🚀 CRITICAL OVERRIDE: Global pre-flight pre-route engine mapping for attachments
+app.use(cors(corsOptions));
+//app.options('/*', cors(corsOptions)); // 👈 Injected to handle instant 204 Preflight responses automatically
 
 app.use(express.json());
 
@@ -128,5 +132,5 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-  console.log(`Server is running with real-time sockets on port ${PORT}`);
+  console.log('Server is running with real-time sockets on port ' + PORT);
 });
