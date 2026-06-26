@@ -73,8 +73,16 @@ export default function UserProfile({ userId, onBack }) {
     return data?.profile?.education ? sortChronologicallyDescending(data.profile.education) : [];
   }, [data?.profile?.education]);
 
+
+  const [isFollowTransitioning, setIsFollowTransitioning] = useState(false);
+
   const handleFollowToggle = async () => {
+    // 🔥 SECURITY LOCK: Agar pehle se request chal rahi hai, toh agla click reject karo
+    if (isFollowTransitioning) return;
+    
+    setIsFollowTransitioning(true);
     const isCurrentlyFollowing = myFollowing.includes(userId.toString());
+    
     try {
       const res = await fetch(`${API_BASE_URL}/api/network/follow/${userId}`, {
         method: 'POST',
@@ -98,10 +106,10 @@ export default function UserProfile({ userId, onBack }) {
           let newFollowers = [...(prev.profile.followers || [])];
           if (isCurrentlyFollowing) {
             newFollowers = newFollowers.filter(f => (f._id || f).toString() !== userId.toString());
-           {/*   toast.success("Unfollowed member node."); */}
+        {/*     toast.success("Unfollowed member node.");    */}
           } else {
             newFollowers.push(userId);
-           {/* toast.success("Following updates live! 📢"); */}
+            {/*  toast.success("Following updates live! 📢");   */}
           }
           return { 
             ...prev, 
@@ -114,6 +122,9 @@ export default function UserProfile({ userId, onBack }) {
       }
     } catch (err) {
       toast.error("Action pipeline sync broke down.");
+    } finally {
+      // 🔥 RELEASE LOCK: Request complete hone par lock kholo
+      setIsFollowTransitioning(false);
     }
   };
 
@@ -265,6 +276,7 @@ export default function UserProfile({ userId, onBack }) {
             <div className="flex flex-row items-center gap-2 pt-0.5 z-20 w-full sm:max-w-xs">
               <button 
                 onClick={handleFollowToggle}
+                disabled={isFollowTransitioning}
                 className={`flex-1 px-6 py-2 rounded-xl text-sm font-bold transition-all shadow-sm flex items-center justify-center gap-1 ${
                   checkIsFollowingProfile 
                     ? 'bg-white border border-slate-400  text-slate-600 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-700' 

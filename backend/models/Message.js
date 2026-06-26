@@ -1,4 +1,3 @@
-// 📑 models/Message.js file kholo aur check karo ki schema is tarah dikhe:
 const mongoose = require('mongoose');
 
 const MessageSchema = new mongoose.Schema({
@@ -14,13 +13,15 @@ const MessageSchema = new mongoose.Schema({
   },
   text: {
     type: String,
-    required: true,
-    trim: true
+    default: "" // 🚀 CHANGE HERE: Make it optional so images can be sent without text
   },
-  // 🔥 INJECT THIS CRITICAL FLAG MATRIX:
+  mediaUrl: {
+    type: String,
+    default: "" // 🚀 ADD THIS LINE: To support image attachment storage paths
+  },
   seen: {
     type: Boolean,
-    default: false // Har naya message default unread rahega
+    default: false
   }
 }, { timestamps: true });
 

@@ -1,4 +1,4 @@
-const mongoose = require('mongoose'); // 👈 Add this line to prevent any object/ID utility crash
+const mongoose = require('mongoose'); // 👈 Prevent any object/ID utility crash
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
@@ -35,14 +35,12 @@ const startConversation = async (req, res) => {
 // 👥 2. Get All Active Conversations List for a User (DEBUGGED 🛠️)
 const getConversations = async (req, res) => {
   try {
-    // 🔥 Sabse safe tarika ID nikalne ka jo baki functions me chal raha hai
     const currentUserId = req.user?._id || req.user?.id || req.user; 
 
     if (!currentUserId) {
       return res.status(401).json({ message: "User context not identified." });
     }
 
-    // Saare conversations fetch karo jisme current user participant hai
     const conversations = await Conversation.find({
       participants: currentUserId
     })
@@ -54,14 +52,13 @@ const getConversations = async (req, res) => {
       return res.status(200).json([]);
     }
 
-    // Har conversation ke liye individually unreadCount calculate karo
     const enrichedConversations = await Promise.all(conversations.map(async (chat) => {
       const chatObj = chat.toObject();
       try {
         const unreadCount = await Message.countDocuments({
           conversationId: chat._id,
-          sender: { $ne: currentUserId }, // Jo kisi aur ne bheja ho
-          seen: false // Aur abhi tak unseen ho
+          sender: { $ne: currentUserId }, 
+          seen: false 
         });
         chatObj.unreadCount = unreadCount || 0;
       } catch (err) {
@@ -123,7 +120,7 @@ const getMessages = async (req, res) => {
 const markAsSeen = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const currentUserId = req.user?._id || req.user?.id || req.user; // 🔥 Aligned with standard extractors
+    const currentUserId = req.user?._id || req.user?.id || req.user; 
 
     await Message.updateMany(
       { conversationId, sender: { $ne: currentUserId }, seen: false },
@@ -137,10 +134,43 @@ const markAsSeen = async (req, res) => {
   }
 };
 
+// 🚀 6. NEW: Send a Media Attachment Message
+const sendMediaMessage = async (req, res) => {
+  try {
+    const { conversationId, text } = req.body;
+    const currentUserId = req.user?._id || req.user?.id || req.user;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "No media asset detected in pipeline." });
+    }
+
+    const mediaUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+
+    const newMessage = await Message.create({
+      conversationId,
+      sender: currentUserId,
+      text: text ? text.trim() : "",
+      mediaUrl: mediaUrl
+    });
+
+    // 🚀 FIXED: Added explicit updatedAt query to force real-time inbox ranking update
+    await Conversation.findByIdAndUpdate(conversationId, {
+      lastMessage: newMessage._id,
+      updatedAt: new Date()
+    });
+
+    res.status(201).json(newMessage);
+  } catch (error) {
+    console.error("Send Media Message Error:", error.message);
+    res.status(500).json({ message: "Server Error dispatching media package" });
+  }
+};
+
 module.exports = {
   startConversation,
   getConversations,
   sendMessage,
   getMessages,
-  markAsSeen
+  markAsSeen,
+  sendMediaMessage // 🔥 Exported safely to sync with routers mapping
 };

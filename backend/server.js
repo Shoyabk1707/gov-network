@@ -6,12 +6,20 @@ const http = require('http'); // ✨ Standard HTTP module for Socket infrastruct
 const { Server } = require('socket.io'); // ✨ Socket.io Server class
 const connectDB = require('./config/db');
 const chatRoutes = require('./routes/chatRoutes');
+const path = require('path'); // 🚀 INJECTED for static folders rendering management
+const fs = require('fs'); // 🚀 INJECTED to auto-verify uploads directory path
 
 const app = express();
 const server = http.createServer(app); // ✨ Express app mapped into HTTP Server instance
 
 // Connect Database
 connectDB();
+
+// 🚀 CRITICAL SECURITY CHECK: Ensure uploads/ directory physically exists before serving static paths
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // 🌐 PREMIUM CONFIGURATION FOR CORS
 const allowedOrigins = [
@@ -42,9 +50,12 @@ const corsOptions = {
 
 // 🚀 CRITICAL OVERRIDE: Global pre-flight pre-route engine mapping for attachments
 app.use(cors(corsOptions));
-//app.options('/*', cors(corsOptions)); // 👈 Injected to handle instant 204 Preflight responses automatically
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // 🚀 INJECTED to handle extended multipart form fields parsing safely
+
+// 🚀 INJECTED STATIC ROUTE: Serves the uploads directory files context to prevent 404 image loops
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
