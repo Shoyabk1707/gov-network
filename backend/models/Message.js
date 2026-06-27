@@ -13,16 +13,27 @@ const MessageSchema = new mongoose.Schema({
   },
   text: {
     type: String,
-    default: "" // 🚀 CHANGE HERE: Make it optional so images can be sent without text
+    default: "" 
   },
   mediaUrl: {
     type: String,
-    default: "" // 🚀 ADD THIS LINE: To support image attachment storage paths
+    default: "" 
+  },
+  // 🚀 STATUS TRACKER FOR TICKS: 'sent' = Single, 'delivered' = Double Grey, 'read' = Double Blue
+  status: {
+    type: String,
+    enum: ['sent', 'delivered', 'read'],
+    default: 'sent'
+  },
+  // 🚀 SOFT DELETE FLAG: True hote hi text replace ho jayega UI par
+  isDeleted: {
+    type: Boolean,
+    default: false
   },
   seen: {
     type: Boolean,
     default: false
   }
-}, { timestamps: true });
+}, { timestamps: true }); 
 
 module.exports = mongoose.model('Message', MessageSchema);

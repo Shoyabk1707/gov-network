@@ -21,6 +21,9 @@ export default function Messages() {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  
+  // 🔍 LIGHTBOX MODAL STATE FOR FULLSCREEN IMAGE VIEW
+  const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
 
   const token = localStorage.getItem('token');
   const messagesEndRef = useRef(null);
@@ -88,10 +91,18 @@ export default function Messages() {
       });
       if (res.ok) {
         setMessages(await res.json());
+        
+        // Mark messages as Read on database layout
         await fetch(`${API_BASE_URL}/api/chat/seen/${conversationId}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        
+        // Notify server that conversation has been viewed to trigger Blue Double Ticks real-time
+        if (socketRef.current) {
+          socketRef.current.emit('mark_conversation_read', { conversationId, readerId: currentUserId });
+        }
+
         setConversations(prev => prev.map(c => c._id === conversationId ? { ...c, unreadCount: 0 } : c));
       }
     } catch (err) {
@@ -123,10 +134,14 @@ export default function Messages() {
 
       if (currentActive && String(incomingMessage.conversationId) === String(currentActive._id)) {
         setMessages((prev) => [...prev, incomingMessage]);
+        
         await fetch(`${API_BASE_URL}/api/chat/seen/${currentActive._id}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}` }
         });
+        
+        socketRef.current.emit('mark_conversation_read', { conversationId: currentActive._id, readerId: currentUserId });
+
         setConversations(prev => prev.map(c => 
           String(c._id) === String(incomingMessage.conversationId)
             ? { ...c, lastMessage: incomingMessage, unreadCount: 0 }
@@ -141,6 +156,23 @@ export default function Messages() {
       }
     });
 
+    // 🚀 NEW SOCKET LISTENER: Real-time dynamic change to Double Ticks (Delivered or Read)
+    socketRef.current.on('message_status_updated_direct', (data) => {
+      setMessages(prev => prev.map(m => m._id === data.messageId ? { ...m, status: data.status } : m));
+    });
+
+    socketRef.current.on('message_read_realtime', (data) => {
+      const currentActive = activeChatRef.current;
+      if (currentActive && String(data.conversationId) === String(currentActive._id)) {
+        setMessages(prev => prev.map(m => m.sender === currentUserId ? { ...m, status: 'read' } : m));
+      }
+    });
+
+    // 🚀 NEW SOCKET LISTENER: Real-time soft-delete catch sync
+    socketRef.current.on('message_deleted_realtime', (data) => {
+      setMessages(prev => prev.map(m => m._id === data.messageId ? { ...m, isDeleted: true, text: "This message was deleted", mediaUrl: "" } : m));
+    });
+
     socketRef.current.on('user_typing_state', (data) => {
       const currentActive = activeChatRef.current;
       if (currentActive && String(data.conversationId) === String(currentActive._id) && String(data.senderId) !== String(currentUserId)) {
@@ -150,6 +182,7 @@ export default function Messages() {
 
     socketRef.current.on('update_online_users', (users) => {
       setOnlineUsersList(users);
+      // If user came online, bulk update messages inside loop list to status 'delivered'
     });
 
     return () => {
@@ -234,6 +267,10 @@ export default function Messages() {
       }
 
       if (savedMsg) {
+        // Evaluate dynamic fallback status if reader user is currently online
+        const isOnline = onlineUsersList.includes(String(targetRecipient._id || targetRecipient));
+        if (isOnline) savedMsg.status = 'delivered';
+
         setMessages((prev) => [...prev, savedMsg]);
         setNewMessageText('');
         setSelectedImage(null);
@@ -252,6 +289,28 @@ export default function Messages() {
     }
   };
 
+  // 🗑️ NEW ACTION TRIGGER: Handles backend soft delete API + Sockets broadcasting
+  const handleDeleteAction = async (messageId) => {
+    if (!window.confirm("Are you sure you want to delete this message?")) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/chat/message/delete/${messageId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const updatedMsg = await res.json();
+        setMessages(prev => prev.map(m => m._id === messageId ? updatedMsg : m));
+        // Trigger instant mirror update across active network channels
+        socketRef.current.emit('delete_message_trigger', { conversationId: activeChat._id, messageId });
+        toast.success("Message deleted successfully.");
+      } else {
+        toast.error("Unauthorized delete operation.");
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const getInitials = (name) => name ? name.trim().split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase() : "U";
 
   const formatMessageGroupDate = (dateString) => {
@@ -264,11 +323,18 @@ export default function Messages() {
     return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
+  // Helper code to map dynamic grey and blue ticks icons layout 
+  const renderTicks = (status) => {
+    if (status === 'read') return <span className="text-blue-500 font-bold ml-1 text-[11px]">✓✓</span>;
+    if (status === 'delivered') return <span className="text-gray-400 font-bold ml-1 text-[11px]">✓✓</span>;
+    return <span className="text-gray-400 font-bold ml-1 text-[11px]">✓</span>;
+  };
+
   const popularEmojis = ["👍", "❤️", "👏", "🔥", "😂", "😮", "🎉", "🙏", "💡", "💯", "✅", "✨"];
   const currentRecipient = activeChat ? getRecipientUser(activeChat) : {};
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-145px)] md:h-[calc(100vh-140px)] flex overflow-hidden animate-fadeIn text-left w-full">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-145px)] md:h-[calc(100vh-140px)] flex overflow-hidden animate-fadeIn text-left w-full relative">
       
       {/* 📁 1. LEFT SIDE INBOX PANEL */}
       <div className={`md:w-80 lg:w-[360px] border-r border-gray-100 flex flex-col h-full bg-slate-50/50 shrink-0 w-full ${activeChat ? 'hidden md:flex' : 'flex'}`}>
@@ -374,18 +440,49 @@ export default function Messages() {
                           <span className="px-3 py-1 bg-slate-200/60 text-slate-600 rounded-full text-[10px] font-bold uppercase tracking-wider">{currentMsgDate}</span>
                         </div>
                       )}
-                      <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-xs font-medium leading-relaxed shadow-xs ${isOwn ? 'bg-slate-900 text-white rounded-br-none' : 'bg-white text-slate-800 border border-slate-150 rounded-bl-none'}`}>
+                      
+                      {/* 🔥 HOVER WRAPPER LAYER: Target element container built for tracking delete option actions */}
+                      <div className={`flex group items-center gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                        
+                        {/* 🗑️ DELETE TRIGGER BUTTON UI: Displays only for your own messages on hover */}
+                        {isOwn && !msg.isDeleted && (
+                          <button 
+                            onClick={() => handleDeleteAction(msg._id)}
+                            className="opacity-0 group-hover:opacity-100 order-1 p-1 text-slate-300 hover:text-red-500 hover:bg-slate-100 rounded-lg transition-all duration-150"
+                            title="Delete Message"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
+
+                        <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-xs font-medium leading-relaxed shadow-xs order-2 ${
+                          msg.isDeleted 
+                            ? 'bg-slate-100 text-slate-400 italic rounded-2xl border border-slate-200 shadow-none' 
+                            : isOwn 
+                              ? 'bg-slate-900 text-white rounded-br-none' 
+                              : 'bg-white text-slate-800 border border-slate-150 rounded-bl-none'
+                        }`}>
                           {msg.mediaUrl && (
-                            <div className="mb-2 rounded-lg overflow-hidden border border-slate-100 max-h-48 bg-black/5">
+                            <div 
+                              onClick={() => setZoomedImageUrl(msg.mediaUrl)} 
+                              className="mb-2 rounded-lg overflow-hidden border border-slate-100 max-h-48 bg-black/5 cursor-zoom-in transition-transform hover:scale-[1.01]"
+                            >
                               <img src={msg.mediaUrl} alt="Shared asset" className="w-full h-auto object-cover" />
                             </div>
                           )}
-                          {msg.text && <p className="whitespace-pre-wrap break-words">{msg.text}</p>}
-                          <span className="text-[9px] block text-right mt-1 opacity-60 font-medium">
-                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                          </span>
+                          <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                          
+                          <div className="flex items-center justify-end gap-1 mt-1 opacity-60">
+                            <span className="text-[9px] block font-medium">
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {/* 🚀 RENDER TICKS: Only display status ticks for your own active non-deleted items */}
+                            {isOwn && !msg.isDeleted && renderTicks(msg.status)}
+                          </div>
                         </div>
+
                       </div>
                     </div>
                   );
@@ -455,6 +552,30 @@ export default function Messages() {
           </div>
         )}
       </div>
+
+      {/* 🚀 LIGHTBOX OVERLAY SCREEN INTERFACE */}
+      {zoomedImageUrl && (
+        <div 
+          onClick={() => setZoomedImageUrl(null)} 
+          className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4 backdrop-blur-xs cursor-zoom-out animate-fadeIn"
+        >
+          <button 
+            onClick={() => setZoomedImageUrl(null)} 
+            className="absolute top-4 right-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-colors duration-150"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+          
+          <img 
+            src={zoomedImageUrl} 
+            alt="Fullscreen preview asset" 
+            className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl select-none" 
+            onClick={(e) => e.stopPropagation()} 
+          />
+        </div>
+      )}
 
     </div>
   );

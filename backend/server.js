@@ -104,10 +104,18 @@ io.on('connection', (socket) => {
     console.log(`🚪 Socket ${socket.id} joined conversation pool room: ${conversationId}`);
   });
 
-  // 3. Listen for real-time text dispatch broadcast relays
+  // 3. Listen for real-time text/media dispatch broadcast relays
   socket.on('send_instant_message', (messageData) => {
     const { conversationId, recipientId } = messageData;
     
+    // Check if recipient is currently active/online on the network
+    const isRecipientOnline = onlineUsers.has(String(recipientId));
+    
+    // 🚀 NEW LOGIC: If recipient is online, automatically elevate initial status to 'delivered' (Double Tick)
+    if (isRecipientOnline) {
+      messageData.status = 'delivered';
+    }
+
     // Broadcast inside the room channel instantly
     socket.to(String(conversationId)).emit('receive_instant_message', messageData);
     
@@ -116,9 +124,30 @@ io.on('connection', (socket) => {
     if (recipientSocketId) {
       io.to(recipientSocketId).emit('incoming_message_notification', {
         conversationId,
-        text: messageData.text
+        text: messageData.text || '🖼️ Sent an attachment'
+      });
+      
+      // 🚀 NEW TICK EVENT: If recipient received it but outside active view room, notify sender to trigger Double Grey Tick
+      socket.emit('message_status_updated_direct', {
+        messageId: messageData._id,
+        conversationId,
+        status: 'delivered'
       });
     }
+  });
+
+  // 🚀 4. NEW EVENT: Real-time Message Deletion Broadcast Relay
+  socket.on('delete_message_trigger', (deletePayload) => {
+    const { conversationId, messageId } = deletePayload;
+    // Notify the room conversation pool immediately to update chat view interface
+    socket.to(String(conversationId)).emit('message_deleted_realtime', { messageId });
+  });
+
+  // 🚀 5. NEW EVENT: Real-time Double Blue Ticks Broadcast Relay
+  socket.on('mark_conversation_read', (readPayload) => {
+    const { conversationId, readerId } = readPayload;
+    // Broadcast to the chat room that recipient has opened the screen layout window
+    socket.to(String(conversationId)).emit('message_read_realtime', { conversationId, readerId });
   });
 
   // Handle sudden disconnections gracefully
