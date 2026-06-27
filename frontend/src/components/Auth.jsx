@@ -10,7 +10,6 @@ export default function Auth() {
   const [isResendDisabled, setIsResendDisabled] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // ✨ FIX: Removed "role" from the initial unified state
   const [formData, setFormData] = useState({
     name: '', email: '', password: '', otp: ''
   });
@@ -32,9 +31,24 @@ export default function Auth() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ==========================================
-  // 🚀 GOOGLE AUTHENTICATION HANDLER
-  // ==========================================
+  // 🚀 MEMORY LOCK JUGAAD ENGINE
+  const storeUserIdentityLocally = (token) => {
+    try {
+      localStorage.setItem('token', token);
+      const payload = JSON.parse(window.atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      
+      const resolvedName = payload?.name || payload?.username || payload?.displayName || "Shoyab Khan";
+      const resolvedTitle = payload?.jobTitle || payload?.role || "Business Development";
+      const resolvedAvatar = payload?.avatar || "";
+
+      localStorage.setItem('userName', resolvedName);
+      localStorage.setItem('userTitle', resolvedTitle);
+      localStorage.setItem('userAvatar', resolvedAvatar);
+    } catch (err) {
+      console.error("Local identity saving fault:", err);
+    }
+  };
+
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/google`, {
@@ -46,7 +60,7 @@ export default function Auth() {
       const data = await response.json();
       
       if (response.ok) {
-        localStorage.setItem('token', data.token);
+        storeUserIdentityLocally(data.token);
         toast.success(data.message || 'Google Auth successful! Redirecting... ✨');
         setTimeout(() => {
           window.location.href = '/'; 
@@ -63,9 +77,6 @@ export default function Auth() {
     toast.error("Google Sign-In was cancelled or failed.");
   };
 
-  // ==========================================
-  // 🚀 STANDARD EMAIL/PASSWORD PIPELINE
-  // ==========================================
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -103,14 +114,14 @@ export default function Auth() {
       const response = await fetch(`${API_BASE_URL}/api/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData) // Dispatches unified payload safely
+        body: JSON.stringify(formData)
       });
 
       const resData = await response.json();
 
       if (response.ok) {
         toast.success('Identity authorized! Establishing session... ✨');
-        localStorage.setItem('token', resData.token);
+        storeUserIdentityLocally(resData.token);
         
         setTimeout(() => {
           window.location.href = '/'; 
@@ -137,7 +148,7 @@ export default function Auth() {
       const data = await response.json();
       
       if (response.ok) {
-        localStorage.setItem('token', data.token);
+        storeUserIdentityLocally(data.token);
         window.location.href = '/'; 
       } else {
         toast.error(data.message || "Invalid credentials!");
@@ -155,7 +166,6 @@ export default function Auth() {
 
   return (
     <div className="max-w-md mx-auto mt-10 p-6 bg-white rounded-2xl shadow-sm border border-gray-100 transition-all">
-      
       <div className="flex bg-slate-50 rounded-lg p-1 mb-6">
         <button 
           type="button"
@@ -188,14 +198,12 @@ export default function Auth() {
             </button>
           </form>
 
-          {/* Divider */}
           <div className="relative flex items-center py-2">
             <div className="flex-grow border-t border-gray-200"></div>
             <span className="flex-shrink-0 mx-4 text-slate-400 text-xs font-semibold uppercase tracking-wider">OR</span>
             <div className="flex-grow border-t border-gray-200"></div>
           </div>
 
-          {/* Google Auth Button */}
           <div className="flex justify-center">
             <GoogleLogin onSuccess={handleGoogleSuccess} onError={handleGoogleError} useOneTap shape="rectangular" size="large" width="350px" />
           </div>
@@ -241,7 +249,6 @@ export default function Auth() {
                 placeholder="000000" 
                 value={formData.otp}
                 onChange={handleChange}
-                // ✨ FIX: Focus ring color ab dark slate me match ho raha hai
                 className="w-full p-4 border border-gray-200 rounded-xl text-center text-2xl font-extrabold tracking-[12px] focus:outline-none focus:border-slate-800 focus:ring-1 focus:ring-slate-800 transition-all bg-slate-50"
                 required 
               />
@@ -250,33 +257,14 @@ export default function Auth() {
                 <span className={timer > 0 ? 'text-slate-500' : 'text-red-500'}>
                   {timer > 0 ? `Code expires in: ${formatTime()}` : 'Verification slot expired!'}
                 </span>
-                <button
-                  type="button"
-                  disabled={isResendDisabled || loading}
-                  onClick={handleRegisterSubmit}
-                  // ✨ FIX: Resend text color dark slate kar diya hai
-                  className="text-slate-800 hover:text-slate-600 transition disabled:opacity-40 disabled:hover:text-slate-800 font-bold underline"
-                >
-                  Resend OTP
-                </button>
               </div>
             </div>
 
-            <div className="space-y-2 pt-2">
-              {/* ✨ FIX: Button background dark theme (bg-slate-900) kar diya */}
-              <button type="submit" disabled={loading || timer === 0} className="w-full bg-slate-900 text-white p-3.5 rounded-xl hover:bg-slate-800 transition flex justify-center items-center font-bold text-sm shadow-sm disabled:opacity-50">
-                {loading ? 'Establishing database records...' : 'Confirm Identity & Establish Profile'}
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setStep(1)} 
-                className="w-full text-slate-500 bg-slate-50 border border-slate-200 p-2.5 rounded-xl text-xs font-bold hover:bg-slate-100 transition"
-              >
-                Modify Details
-              </button>
-            </div>
+            <button type="submit" disabled={loading || timer === 0} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition shadow-xs">
+              {loading ? 'Verifying...' : 'Verify and Register'}
+            </button>
           </form>
-        )
+        ) // 🚀 FIXED: Dynamic layout block closed with clean closing parenthesis
       )}
 
       <p className="text-[11px] text-gray-400 text-center mt-6 pt-2 leading-relaxed">
