@@ -76,22 +76,30 @@ const getConversations = async (req, res) => {
   }
 };
 
-// 💬 3. Send a Message & Update Last Message Pointer
+// 💬 3. UPDATED: Send a Message & Support Message Reply Threading
+// 💬 3. FIXED: Send a Message & Support Deep Reply Threading Population
 const sendMessage = async (req, res) => {
   try {
-    const { conversationId, text } = req.body;
+    const { conversationId, text, replyTo } = req.body;
     const currentUserId = req.user?._id || req.user?.id || req.user;
 
     if (!text?.trim()) {
       return res.status(400).json({ message: "Message content cannot be empty" });
     }
 
-    // Default status during execution setup is 'sent'
     const newMessage = await Message.create({
       conversationId,
       sender: currentUserId,
       text: text.trim(),
+      fileType: 'text',
+      replyTo: replyTo && mongoose.Types.ObjectId.isValid(replyTo) ? replyTo : null,
       status: 'sent'
+    });
+
+    // 🚀 FIXED: Deep populate reply details along with sender structure before returning response
+    const populatedMessage = await Message.findById(newMessage._id).populate({
+      path: 'replyTo',
+      select: 'text mediaUrl sender isDeleted fileType'
     });
 
     await Conversation.findByIdAndUpdate(conversationId, {
@@ -99,19 +107,24 @@ const sendMessage = async (req, res) => {
       updatedAt: new Date()
     });
 
-    res.status(201).json(newMessage);
+    res.status(201).json(populatedMessage);
   } catch (error) {
     console.error("Send Message Error:", error.message);
     res.status(500).json({ message: "Server Error dispatching text package" });
   }
 };
 
-// 📡 4. Fetch Message History For an Active Stream Window
+// 📡 4. UPDATED: Fetch Message History With Threading Support
 const getMessages = async (req, res) => {
   try {
     const { conversationId } = req.params;
     
+    // 🚀 INJECTED: Populate reply tree nodes cleanly
     const messages = await Message.find({ conversationId })
+      .populate({
+        path: 'replyTo',
+        select: 'text mediaUrl sender isDeleted fileType'
+      })
       .sort({ createdAt: 1 });
 
     res.json(messages);
@@ -127,7 +140,6 @@ const markAsSeen = async (req, res) => {
     const { conversationId } = req.params;
     const currentUserId = req.user?._id || req.user?.id || req.user; 
 
-    // 🔥 UPDATED: Update status fields data state to 'read' along with seen flag logic
     await Message.updateMany(
       { conversationId, sender: { $ne: currentUserId }, status: { $ne: 'read' } },
       { $set: { seen: true, status: 'read' } }
@@ -140,19 +152,25 @@ const markAsSeen = async (req, res) => {
   }
 };
 
-// 🚀 6. Send a Media Attachment Message via Cloudinary CDN
+// 🚀 6. UPDATED: Send a Media / Document Message via Cloudinary CDN Auto-Router
 const sendMediaMessage = async (req, res) => {
   try {
-    const { conversationId, text } = req.body;
+    const { conversationId, text, replyTo } = req.body; // 🚀 Catch threading hook params
     const currentUserId = req.user?._id || req.user?.id || req.user;
 
     if (!req.file) {
       return res.status(400).json({ message: "No media asset detected in pipeline." });
     }
 
+    // 🚀 DYNAMIC EVALUATION: Track extension types to distinguish documents from images
+    const fileExt = req.file.originalname.split('.').pop().toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(fileExt);
+    const calculatedFileType = isImage ? 'image' : 'document';
+
+    // 🔥 Cloudinary uploads with absolute secure auto routing support (PDF, Docs, Zips support)
     const cloudinaryUploadResponse = await cloudinary.uploader.upload(req.file.path, {
       folder: 'chat_attachments',
-      resource_type: 'auto'
+      resource_type: 'auto' 
     });
 
     const mediaUrl = cloudinaryUploadResponse.secure_url;
@@ -166,7 +184,14 @@ const sendMediaMessage = async (req, res) => {
       sender: currentUserId,
       text: text ? text.trim() : "",
       mediaUrl: mediaUrl,
+      fileType: calculatedFileType, // 🚀 Save dynamic type 'image' or 'document'
+      replyTo: replyTo && mongoose.Types.ObjectId.isValid(replyTo) ? replyTo : null,
       status: 'sent'
+    });
+
+    const populatedMessage = await Message.findById(newMessage._id).populate({
+      path: 'replyTo',
+      select: 'text mediaUrl sender isDeleted fileType'
     });
 
     await Conversation.findByIdAndUpdate(conversationId, {
@@ -174,7 +199,7 @@ const sendMediaMessage = async (req, res) => {
       updatedAt: new Date()
     });
 
-    res.status(201).json(newMessage);
+    res.status(201).json(populatedMessage);
   } catch (error) {
     if (req.file && req.file.path && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
@@ -184,12 +209,10 @@ const sendMediaMessage = async (req, res) => {
   }
 };
 
-// 🗑️ 7. FIXED: Soft-Delete Message Route Controller Functionality (Airtight ID Handshake)
+// 🗑️ 7. Soft-Delete Message Route Controller Functionality
 const deleteMessage = async (req, res) => {
   try {
     const { messageId } = req.params;
-    
-    // 🔥 SAFELY EXTRACT: Extract user ID exactly how it's handled in sendMessage / getConversations
     const currentUserId = req.user?._id || req.user?.id || req.user;
 
     if (!currentUserId) {
@@ -201,7 +224,6 @@ const deleteMessage = async (req, res) => {
       return res.status(404).json({ message: "Requested message log not found." });
     }
 
-    // 🚀 AIRTIGHT HANDSHAKE: Convert both objects to standard string to prevent strict hex/mismatch blocks
     const senderIdStr = message.sender._id ? String(message.sender._id) : String(message.sender);
     const currentUserIdStr = currentUserId._id ? String(currentUserId._id) : String(currentUserId);
 
@@ -209,10 +231,9 @@ const deleteMessage = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized operation attempt. Owner context mismatch." });
     }
 
-    // Toggle flags configuration mapping values
     message.isDeleted = true;
     message.text = "This message was deleted";
-    message.mediaUrl = ""; // Clears attachment reference path link 
+    message.mediaUrl = ""; 
     await message.save();
 
     res.status(200).json(message);
@@ -222,7 +243,7 @@ const deleteMessage = async (req, res) => {
   }
 };
 
-// 🔄 8. NEW: Bulk Update Message Status (Used to switch single to double ticks on app launch)
+// 🔄 8. Bulk Update Message Status
 const updateMessageStatus = async (req, res) => {
   try {
     const { conversationId, status } = req.body;
@@ -251,6 +272,6 @@ module.exports = {
   getMessages,
   markAsSeen,
   sendMediaMessage,
-  deleteMessage,       // 🚀 Exported for routing linkage configuration
-  updateMessageStatus  // 🚀 Exported for sync operations
+  deleteMessage,       
+  updateMessageStatus  
 };

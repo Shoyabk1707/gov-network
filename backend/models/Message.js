@@ -19,13 +19,23 @@ const MessageSchema = new mongoose.Schema({
     type: String,
     default: "" 
   },
-  // 🚀 STATUS TRACKER FOR TICKS: 'sent' = Single, 'delivered' = Double Grey, 'read' = Double Blue
+  // 🚀 1. FILE TYPE TRACKER: 'image' or 'document' (PDF, Excel, etc.)
+  fileType: {
+    type: String,
+    enum: ['text', 'image', 'document'],
+    default: 'text'
+  },
+  // 🚀 3. MESSAGE REPLY THREADING REFERENCE: Parent message binding pointer
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+    default: null
+  },
   status: {
     type: String,
     enum: ['sent', 'delivered', 'read'],
     default: 'sent'
   },
-  // 🚀 SOFT DELETE FLAG: True hote hi text replace ho jayega UI par
   isDeleted: {
     type: Boolean,
     default: false

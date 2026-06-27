@@ -25,6 +25,9 @@ export default function Messages() {
   // 🔍 LIGHTBOX MODAL STATE FOR FULLSCREEN IMAGE VIEW
   const [zoomedImageUrl, setZoomedImageUrl] = useState(null);
 
+  // ↩️ THREADING SYSTEM STATE HOOKS
+  const [replyingToMessage, setReplyingToMessage] = useState(null);
+
   const token = localStorage.getItem('token');
   const messagesEndRef = useRef(null);
   const socketRef = useRef(null);
@@ -92,13 +95,11 @@ export default function Messages() {
       if (res.ok) {
         setMessages(await res.json());
         
-        // Mark messages as Read on database layout
         await fetch(`${API_BASE_URL}/api/chat/seen/${conversationId}`, {
           method: 'PATCH',
           headers: { 'Authorization': `Bearer ${token}` }
         });
         
-        // Notify server that conversation has been viewed to trigger Blue Double Ticks real-time
         if (socketRef.current) {
           socketRef.current.emit('mark_conversation_read', { conversationId, readerId: currentUserId });
         }
@@ -122,6 +123,7 @@ export default function Messages() {
       setSelectedImage(null);
       setImagePreviewUrl(null);
       setShowEmojiPicker(false);
+      setReplyingToMessage(null);
     }
   }, [activeChat]);
 
@@ -156,7 +158,6 @@ export default function Messages() {
       }
     });
 
-    // 🚀 NEW SOCKET LISTENER: Real-time dynamic change to Double Ticks (Delivered or Read)
     socketRef.current.on('message_status_updated_direct', (data) => {
       setMessages(prev => prev.map(m => m._id === data.messageId ? { ...m, status: data.status } : m));
     });
@@ -168,9 +169,8 @@ export default function Messages() {
       }
     });
 
-    // 🚀 NEW SOCKET LISTENER: Real-time soft-delete catch sync
     socketRef.current.on('message_deleted_realtime', (data) => {
-      setMessages(prev => prev.map(m => m._id === data.messageId ? { ...m, isDeleted: true, text: "This message was deleted", mediaUrl: "" } : m));
+      setMessages(prev => prev.map(m => m._id === data.messageId ? { ...m, isDeleted: true, text: "This message was deleted", mediaUrl: "", fileType: "text" } : m));
     });
 
     socketRef.current.on('user_typing_state', (data) => {
@@ -182,7 +182,6 @@ export default function Messages() {
 
     socketRef.current.on('update_online_users', (users) => {
       setOnlineUsersList(users);
-      // If user came online, bulk update messages inside loop list to status 'delivered'
     });
 
     return () => {
@@ -211,19 +210,27 @@ export default function Messages() {
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
     typingTimeoutRef.current = setTimeout(() => {
-      socketRef.current.emit('user_typing_state', { conversationId: activeChat._id, senderId: currentUserId, isTyping: false });
+      if (socketRef.current && activeChatRef.current) {
+        socketRef.current.emit('user_typing_state', { conversationId: activeChatRef.current._id, senderId: currentUserId, isTyping: false });
+      }
     }, 1500);
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("File size limits exceeded (Max 5MB).");
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error("File size limits exceeded (Max 10MB).");
         return;
       }
       setSelectedImage(file);
-      setImagePreviewUrl(URL.createObjectURL(file));
+      
+      const ext = file.name.split('.').pop().toLowerCase();
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext)) {
+        setImagePreviewUrl(URL.createObjectURL(file));
+      } else {
+        setImagePreviewUrl("document_placeholder"); 
+      }
     }
   };
 
@@ -250,6 +257,9 @@ export default function Messages() {
         formData.append('conversationId', activeChat._id);
         formData.append('text', textPayload);
         formData.append('chatMedia', selectedImage);
+        if (replyingToMessage) {
+          formData.append('replyTo', replyingToMessage._id);
+        }
 
         const res = await fetch(`${API_BASE_URL}/api/chat/message/media`, {
           method: 'POST',
@@ -261,13 +271,16 @@ export default function Messages() {
         const res = await fetch(`${API_BASE_URL}/api/chat/message`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-          body: JSON.stringify({ conversationId: activeChat._id, text: textPayload })
+          body: JSON.stringify({ 
+            conversationId: activeChat._id, 
+            text: textPayload,
+            replyTo: replyingToMessage ? replyingToMessage._id : null 
+          })
         });
         if (res.ok) savedMsg = await res.json();
       }
 
       if (savedMsg) {
-        // Evaluate dynamic fallback status if reader user is currently online
         const isOnline = onlineUsersList.includes(String(targetRecipient._id || targetRecipient));
         if (isOnline) savedMsg.status = 'delivered';
 
@@ -276,6 +289,7 @@ export default function Messages() {
         setSelectedImage(null);
         setImagePreviewUrl(null);
         setShowEmojiPicker(false);
+        setReplyingToMessage(null); 
         
         socketRef.current.emit('send_instant_message', { ...savedMsg, recipientId: targetRecipient._id || targetRecipient });
         setConversations(prev => prev.map(c => 
@@ -289,7 +303,6 @@ export default function Messages() {
     }
   };
 
-  // 🗑️ NEW ACTION TRIGGER: Handles backend soft delete API + Sockets broadcasting
   const handleDeleteAction = async (messageId) => {
     if (!window.confirm("Are you sure you want to delete this message?")) return;
     try {
@@ -300,7 +313,6 @@ export default function Messages() {
       if (res.ok) {
         const updatedMsg = await res.json();
         setMessages(prev => prev.map(m => m._id === messageId ? updatedMsg : m));
-        // Trigger instant mirror update across active network channels
         socketRef.current.emit('delete_message_trigger', { conversationId: activeChat._id, messageId });
         toast.success("Message deleted successfully.");
       } else {
@@ -308,6 +320,31 @@ export default function Messages() {
       }
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  // 🚀 NEW SECURE DOWNLOAD ENGINE: Bypasses Cloudinary 401 link security restrictions by streaming blob payload directly
+  const handleSecureDownload = async (url, originalName) => {
+    try {
+      toast.loading("Downloading document...", { id: "doc-dl" });
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Network security block.");
+      
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+      anchor.download = originalName || "attachment-file.pdf";
+      document.body.appendChild(anchor);
+      anchor.click();
+      
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("File downloaded successfully!", { id: "doc-dl" });
+    } catch (err) {
+      toast.error("Secure link blocked. Opening via backup portal instead.", { id: "doc-dl" });
+      window.open(url, "_blank");
     }
   };
 
@@ -323,11 +360,18 @@ export default function Messages() {
     return d.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
-  // Helper code to map dynamic grey and blue ticks icons layout 
   const renderTicks = (status) => {
     if (status === 'read') return <span className="text-blue-500 font-bold ml-1 text-[11px]">✓✓</span>;
     if (status === 'delivered') return <span className="text-gray-400 font-bold ml-1 text-[11px]">✓✓</span>;
     return <span className="text-gray-400 font-bold ml-1 text-[11px]">✓</span>;
+  };
+
+  const checkIsDocumentType = (msg) => {
+    if (msg.fileType === 'document') return true;
+    if (!msg.mediaUrl) return false;
+    const urlParts = msg.mediaUrl.toLowerCase().split('?')[0].split('.');
+    const ext = urlParts[urlParts.length - 1];
+    return ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'txt'].includes(ext);
   };
 
   const popularEmojis = ["👍", "❤️", "👏", "🔥", "😂", "😮", "🎉", "🙏", "💡", "💯", "✅", "✨"];
@@ -381,7 +425,7 @@ export default function Messages() {
                     <p className="text-[11px] text-slate-400 font-medium truncate mt-0.5">{targetUser.jobTitle || "Member"}</p>
                     <div className="flex items-center justify-between mt-1 gap-2">
                       <p className={`text-xs truncate flex-1 ${hasUnread ? 'font-bold text-slate-950' : 'text-slate-500'}`}>
-                        {chat.lastMessage?.sender === currentUserId ? 'You: ' : ''}{chat.lastMessage?.text || (chat.lastMessage?.mediaUrl ? '🖼️ Attachment' : 'New Bridge')}
+                        {chat.lastMessage?.sender === currentUserId ? 'You: ' : ''}{chat.lastMessage?.text || (chat.lastMessage?.mediaUrl ? '📁 Attachment File' : 'New Bridge')}
                       </p>
                       {hasUnread && (
                         <span className="bg-slate-950 text-white text-[10px] font-black h-4 min-w-4 px-1 rounded-full flex items-center justify-center tracking-tighter shrink-0">
@@ -428,65 +472,137 @@ export default function Messages() {
               {loadingMessages ? (
                 <div className="text-center text-xs font-semibold text-slate-400 animate-pulse pt-6">Pulling logs...</div>
               ) : (
-                messages.map((msg, index) => {
-                  const isOwn = String(msg.sender) === String(currentUserId);
-                  const currentMsgDate = formatMessageGroupDate(msg.createdAt);
-                  const showDateDivider = index === 0 || currentMsgDate !== formatMessageGroupDate(messages[index - 1].createdAt);
+                <>
+                  {messages.map((msg, index) => {
+                    const isOwn = String(msg.sender) === String(currentUserId);
+                    const currentMsgDate = formatMessageGroupDate(msg.createdAt);
+                    const showDateDivider = index === 0 || currentMsgDate !== formatMessageGroupDate(messages[index - 1].createdAt);
+                    const isDocFile = checkIsDocumentType(msg);
 
-                  return (
-                    <div key={msg._id || index} className="space-y-3">
-                      {showDateDivider && (
-                        <div className="flex justify-center my-4">
-                          <span className="px-3 py-1 bg-slate-200/60 text-slate-600 rounded-full text-[10px] font-bold uppercase tracking-wider">{currentMsgDate}</span>
-                        </div>
-                      )}
-                      
-                      {/* 🔥 HOVER WRAPPER LAYER: Target element container built for tracking delete option actions */}
-                      <div className={`flex group items-center gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                        
-                        {/* 🗑️ DELETE TRIGGER BUTTON UI: Displays only for your own messages on hover */}
-                        {isOwn && !msg.isDeleted && (
-                          <button 
-                            onClick={() => handleDeleteAction(msg._id)}
-                            className="opacity-0 group-hover:opacity-100 order-1 p-1 text-slate-300 hover:text-red-500 hover:bg-slate-100 rounded-lg transition-all duration-150"
-                            title="Delete Message"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                        )}
-
-                        <div className={`max-w-[70%] px-4 py-2.5 rounded-2xl text-xs font-medium leading-relaxed shadow-xs order-2 ${
-                          msg.isDeleted 
-                            ? 'bg-slate-100 text-slate-400 italic rounded-2xl border border-slate-200 shadow-none' 
-                            : isOwn 
-                              ? 'bg-slate-900 text-white rounded-br-none' 
-                              : 'bg-white text-slate-800 border border-slate-150 rounded-bl-none'
-                        }`}>
-                          {msg.mediaUrl && (
-                            <div 
-                              onClick={() => setZoomedImageUrl(msg.mediaUrl)} 
-                              className="mb-2 rounded-lg overflow-hidden border border-slate-100 max-h-48 bg-black/5 cursor-zoom-in transition-transform hover:scale-[1.01]"
-                            >
-                              <img src={msg.mediaUrl} alt="Shared asset" className="w-full h-auto object-cover" />
-                            </div>
-                          )}
-                          <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                          
-                          <div className="flex items-center justify-end gap-1 mt-1 opacity-60">
-                            <span className="text-[9px] block font-medium">
-                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            {/* 🚀 RENDER TICKS: Only display status ticks for your own active non-deleted items */}
-                            {isOwn && !msg.isDeleted && renderTicks(msg.status)}
+                    return (
+                      <div key={msg._id || index} className="space-y-3">
+                        {showDateDivider && (
+                          <div className="flex justify-center my-4">
+                            <span className="px-3 py-1 bg-slate-200/60 text-slate-600 rounded-full text-[10px] font-bold uppercase tracking-wider">{currentMsgDate}</span>
                           </div>
-                        </div>
+                        )}
+                        
+                        {/* HOVER WRAPPER LAYER */}
+                        <div className={`flex group items-center gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                          
+                          {/* ACTION PANEL ROW */}
+                          <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150 ${isOwn ? 'order-1' : 'order-3'}`}>
+                            {!msg.isDeleted && (
+                              <button 
+                                onClick={() => setReplyingToMessage(msg)}
+                                className="p-1 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-transform active:scale-95"
+                                title="Reply to message"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                              </button>
+                            )}
+                            
+                            {isOwn && !msg.isDeleted && (
+                              <button 
+                                onClick={() => handleDeleteAction(msg._id)}
+                                className="p-1 text-slate-300 hover:text-red-500 hover:bg-slate-100 rounded-lg"
+                                title="Delete Message"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
 
+                          {/* MESSAGE CONTAINER BUBBLE */}
+                          <div className={`max-w-[75%] md:max-w-[65%] px-4 py-2.5 rounded-2xl text-xs font-medium leading-relaxed shadow-xs order-2 flex flex-col text-left ${
+                            msg.isDeleted 
+                              ? 'bg-slate-100 text-slate-400 italic rounded-2xl border border-slate-200 shadow-none' 
+                              : isOwn 
+                                ? 'bg-slate-900 text-white rounded-br-none' 
+                                : 'bg-white text-slate-800 border border-slate-150 rounded-bl-none'
+                          }`}>
+                            
+                            {/* ↩️ UPDATED: WHATSAPP-STYLE QUOTED REPLIED TEXT VIEW INNER FRAME */}
+                            {msg.replyTo && (
+                              <div className={`mb-2 p-2 rounded-lg border-l-4 text-[11px] truncate max-w-full flex flex-col text-left ${
+                                isOwn ? 'bg-white/10 text-slate-200 border-white/40' : 'bg-slate-100 text-slate-600 border-slate-400'
+                              }`}>
+                                <span className="font-extrabold block text-[10px] mb-0.5 opacity-80 text-left">
+                                  ↩️ Reply to {String(msg.replyTo.sender) === String(currentUserId) ? "You" : currentRecipient.name}
+                                </span>
+                                {msg.replyTo.isDeleted ? (
+                                  <span className="italic">This message was deleted</span>
+                                ) : (
+                                  <span className="truncate block opacity-90 text-left">
+                                    {msg.replyTo.text || (['pdf', 'doc', 'docx', 'xls', 'xlsx'].includes(msg.replyTo.mediaUrl?.split('.').pop()?.toLowerCase()) ? '📁 Document File' : '🖼️ Image Attachment')}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {/* 📁 AIRTIGHT RENDER MATRIX */}
+                            {msg.mediaUrl && !msg.isDeleted && (
+                              isDocFile ? (
+                                <div 
+                                  onClick={() => handleSecureDownload(msg.mediaUrl, msg.mediaUrl.split('/').pop().split('-').pop())}
+                                  className={`p-3 rounded-xl flex items-center gap-3 border mb-1.5 cursor-pointer transition-all ${
+                                    isOwn 
+                                      ? 'bg-white/15 border-white/20 text-white hover:bg-white/25' 
+                                      : 'bg-slate-50 border-slate-200 text-slate-800 hover:bg-slate-100'
+                                  }`}
+                                >
+                                  <span className="text-xl shrink-0">📄</span>
+                                  <div className="min-w-0 flex-1 text-left">
+                                    <p className="font-bold truncate text-[11px] mb-0.5">
+                                      {msg.mediaUrl.split('/').pop().split('-').pop() || "view_document.pdf"}
+                                    </p>
+                                    <p className="text-[9px] opacity-70 uppercase tracking-wider">Click to Download File</p>
+                                  </div>
+                                  <span className="text-sm shrink-0 opacity-70">📥</span>
+                                </div>
+                              ) : (
+                                <div 
+                                  onClick={() => setZoomedImageUrl(msg.mediaUrl)} 
+                                  className="mb-2 rounded-lg overflow-hidden border border-slate-100 max-h-48 bg-black/5 cursor-zoom-in transition-transform hover:scale-[1.01]"
+                                >
+                                  <img src={msg.mediaUrl} alt="Shared asset" className="w-full h-auto object-cover" />
+                                </div>
+                              )
+                            )}
+                            
+                            {msg.text && <p className="whitespace-pre-wrap break-words text-left">{msg.text}</p>}
+                            
+                            <div className="flex items-center justify-end gap-1 mt-1 opacity-60">
+                              <span className="text-[9px] block font-medium">
+                                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {isOwn && !msg.isDeleted && renderTicks(msg.status)}
+                            </div>
+                          </div>
+
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* REAL-TIME TYPING ANIMATION BUBBLE */}
+                  {isRecipientTyping && (
+                    <div className="flex justify-start animate-fadeIn">
+                      <div className="bg-slate-100 text-slate-600 border border-slate-200 px-4 py-2.5 rounded-2xl rounded-bl-none text-xs font-semibold flex items-center gap-1">
+                        <span>{currentRecipient.name || "Connection"} is typing</span>
+                        <span className="flex gap-0.5 ml-1">
+                          <span className="h-1 w-1 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                          <span className="h-1 w-1 bg-slate-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                          <span className="h-1 w-1 bg-slate-500 rounded-full animate-bounce"></span>
+                        </span>
                       </div>
                     </div>
-                  );
-                })
+                  )}
+                </>
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -494,11 +610,30 @@ export default function Messages() {
             {/* Form Input Action Module Frame */}
             <div className="border-t border-gray-100 p-3 bg-white shrink-0 relative z-30">
               
+              {/* ↩️ FLOATING REPLY PREVIEW BOARD */}
+              {replyingToMessage && (
+                <div className="mb-2 p-2.5 bg-slate-50 border-l-4 border-slate-900 rounded-r-xl flex items-center justify-between animate-fadeIn text-xs shadow-xs">
+                  <div className="min-w-0 flex-1 text-left">
+                    <p className="font-extrabold text-slate-900">Replying to {String(replyingToMessage.sender) === String(currentUserId) ? "yourself" : currentRecipient.name}</p>
+                    <p className="text-slate-500 truncate mt-0.5">
+                      {replyingToMessage.text || (['pdf', 'doc', 'docx'].includes(replyingToMessage.mediaUrl?.split('.').pop()?.toLowerCase()) ? '📁 Document File' : '🖼️ Image Attachment')}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setReplyingToMessage(null)} className="text-slate-400 hover:text-slate-900 p-1.5 rounded-lg hover:bg-slate-200/50 transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              )}
+
               {/* Media File Attachment Preview Card */}
               {imagePreviewUrl && (
                 <div className="mb-2 p-2 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between animate-fadeIn">
                   <div className="flex items-center gap-3">
-                    <img src={imagePreviewUrl} alt="Upload thumbnail" className="w-12 h-12 object-cover rounded-lg border border-slate-200 shadow-xs" />
+                    {imagePreviewUrl === "document_placeholder" ? (
+                      <div className="w-12 h-12 rounded-lg bg-slate-900 flex items-center justify-center text-xl text-white font-bold animate-pulse">📄</div>
+                    ) : (
+                      <img src={imagePreviewUrl} alt="Upload thumbnail" className="w-12 h-12 object-cover rounded-lg border border-slate-200 shadow-xs" />
+                    )}
                     <span className="text-[11px] font-bold text-slate-600 truncate max-w-[180px]">{selectedImage?.name}</span>
                   </div>
                   <button type="button" onClick={() => { setSelectedImage(null); setImagePreviewUrl(null); }} className="text-slate-400 hover:text-red-500 p-1 rounded-full hover:bg-slate-100">
@@ -521,9 +656,9 @@ export default function Messages() {
               {/* Master Input Control Elements Bar Row */}
               <form onSubmit={handleSendMessage} className="flex items-center gap-2">
                 <div className="flex items-center gap-1 shrink-0">
-                  <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageChange} />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-colors" title="Attach Image">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" className="hidden" onChange={handleImageChange} />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-colors" title="Attach Files / Docs">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" /></svg>
                   </button>
 
                   <button type="button" onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={`p-2 rounded-xl hover:bg-slate-50 transition-colors ${showEmojiPicker ? 'text-slate-950 bg-slate-50' : 'text-slate-400 hover:text-slate-900'}`} title="Add Emoji">
@@ -534,7 +669,7 @@ export default function Messages() {
                 <input 
                   ref={inputFieldRef} 
                   type="text" 
-                  placeholder="Write a message response..." 
+                  placeholder={replyingToMessage ? "Write a reply response..." : "Write a message response..."} 
                   value={newMessageText} 
                   onChange={handleInputChange} 
                   className="flex-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:bg-white focus:ring-1 focus:ring-slate-900 transition-all block w-full" 
