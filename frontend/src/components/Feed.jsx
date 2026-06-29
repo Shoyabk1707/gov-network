@@ -10,7 +10,6 @@ export default function Feed() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
   
-  // ✨ UPDATED: Pure platform ke liye simplified unified tabs list
   const tabs = ['All', 'General', 'Exam update', 'Study material'];
   const token = localStorage.getItem('token');
 
@@ -57,29 +56,28 @@ export default function Feed() {
     }
   };
 
-  // 🔥 UPDATED FILTER LOGIC: Exact database schema values matching system
   const filteredPosts = posts.filter(post => {
     if (activeTab === 'All') return true;
-    
     const postCategory = post.category || 'General';
     return postCategory.trim().toLowerCase() === activeTab.trim().toLowerCase();
   });
   
   return (
-    <div className="space-y-6 animate-fadeIn text-left">
+    // 🚀 LINKEDIN TIGHT GRID: Reduced parent spaces from space-y-6 down to tight mobile margin flows
+    <div className="space-y-2 md:space-y-3 animate-fadeIn text-left w-full">
       
       {/* Post Creator Box */}
       <PostComposer onPostSuccess={(newPost) => setPosts([newPost, ...posts])} />
 
-      {/* Dynamic Tabs Panel */}
-      <div className="flex bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm overflow-x-auto hide-scrollbar">
+      {/* Dynamic Tabs Panel: Trimmed padding down to 1px and corner layout into static rounded-md */}
+      <div className="flex bg-white p-2 rounded-md border border-gray-200 shadow-xs overflow-x-auto hide-scrollbar mx-0 md:mx-0">
         {tabs.map(tab => (
           <button 
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`flex-1 min-w-max px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            className={`flex-1 min-w-max px-3 py-1.5 text-xs font-bold rounded-md transition-all ${
               activeTab === tab 
-                ? 'bg-slate-900 text-white shadow-sm' 
+                ? 'bg-slate-900 text-white shadow-xs' 
                 : 'text-gray-500 hover:bg-gray-50'
             }`}
           >
@@ -88,12 +86,12 @@ export default function Feed() {
         ))}
       </div>
 
-      {/* Live Stream List */}
-      <div className="space-y-4">
+      {/* Live Stream List: Tight gap spacing mirroring the mobile LinkedIn timeline view */}
+      <div className="space-y-2 w-full">
         {loading ? (
           <><SkeletonPost /><SkeletonPost /></>
         ) : filteredPosts.length === 0 ? (
-          <div className="text-center text-gray-400 text-xs font-medium py-12 bg-white rounded-2xl shadow-sm border border-gray-200">
+          <div className="text-center text-gray-400 text-xs font-medium py-10 bg-white rounded-md shadow-xs border border-gray-200">
             No updates found under "{activeTab}" yet. Be the first to post!
           </div>
         ) : (

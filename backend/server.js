@@ -81,6 +81,9 @@ const io = new Server(server, {
   }
 });
 
+// 🚀 LINKEDIN SPECIFICATION HOOK: Express controllers aur routes ke liye setup map karo
+app.set('io', io);
+
 // Memory registry to track live users mapped to their socket connection IDs
 let onlineUsers = new Map();
 
@@ -92,6 +95,10 @@ io.on('connection', (socket) => {
     if (userId) {
       onlineUsers.set(String(userId), socket.id);
       console.log(`👤 User logged online: ${userId}`);
+      
+      // 🚀 PRIVATE ROOM HOOK: Connect user to their personal secure notification room
+      socket.join(String(userId));
+      console.log(`📡 Connected user ${userId} to their personal notification room channel.`);
       
       // ✨ BROADCAST: Saare users ko live active status sync karo instantly
       io.emit('update_online_users', Array.from(onlineUsers.keys()));

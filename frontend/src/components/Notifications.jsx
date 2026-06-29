@@ -1,29 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
+import { SocketContext } from '../App'; // 🚀 HOOK SOCKET GLOBAL CONTROLLER
 import toast from 'react-hot-toast';
 
-export default function Notifications() {
+export default function Notifications({ setUnreadCount }) {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
+  const socket = useContext(SocketContext); // 🚀 EXTRACT OPEN ACTIVE PIPE
 
-  // --- 📡 FETCH REAL NOTIFICATIONS FROM BACKEND ---
+  // --- 📡 FETCH NOTIFICATIONS FROM BACKEND ---
   const fetchNotifications = async () => {
     try {
       setLoading(true);
       const res = await fetch(`${API_BASE_URL}/api/notifications`, {
-        headers: { 
-          'Authorization': `Bearer ${token}` 
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
       
       if (res.ok) {
         const data = await res.json();
         setNotifications(data);
-      } else {
-        console.error("Failed to fetch notifications from server");
+        
+        // Notifications view open hote hi system clear reset handle API fire
+        setUnreadCount(0); 
       }
     } catch (err) {
       console.error("Error fetching notifications:", err);
@@ -40,7 +41,31 @@ export default function Notifications() {
     }
   }, [token]);
 
-  // --- 🛠️ HELPER: DYNAMIC ICON RENDERER BASED ON TYPE ---
+  // --- 🚀 ATTACH STEALTH ENGINE ACTION LISTENERS ---
+  useEffect(() => {
+    if (!socket) return;
+
+    // A. New Notification Appends Realtime
+    socket.on('new_notification', (newLog) => {
+      // Fetch notifications list freshly or append logic safely
+      setNotifications(prev => [newLog, ...prev]);
+    });
+
+    // B. Stealth Mode Active: Unfollow event catches and completely wipes the row instantly
+    socket.on('delete_notification', (data) => {
+      setNotifications(prev => prev.filter(n => {
+        const matchSender = (n.fromUser?._id || n.fromUser) === data.fromUser;
+        const matchType = n.type === data.type;
+        return !(matchSender && matchType); // Drops only targeted index
+      }));
+    });
+
+    return () => {
+      socket.off('new_notification');
+      socket.off('delete_notification');
+    };
+  }, [socket]);
+
   const getNotificationIcon = (type) => {
     switch (type) {
       case 'request_accepted':
@@ -77,7 +102,6 @@ export default function Notifications() {
     }
   };
 
-  // --- 🛠️ HELPER: FORMAT DATE ON THE FLY ---
   const formatTime = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -89,40 +113,35 @@ export default function Notifications() {
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    return date.toLocaleDateString();
+    return date.toLocaleDateString([], {day: 'numeric', month: 'short'});
   };
 
-  // 👤 HANDLE PROFILE NAVIGATION
   const handleProfileClick = (e, userId) => {
     e.stopPropagation(); 
-    if (userId) {
-      navigate(`/creator/${userId}`);
-    }
+    if (userId) navigate(`/user/${userId}`);
   };
 
-  // 📦 HANDLE ENTIRE NOTIFICATION ROW INTERACTION
   const handleRowClick = (n) => {
     if (n.postId) {
       navigate(`/post/${n.postId}`);
-    } else if (n.fromUser?._id) {
-      navigate(`/creator/${n.fromUser._id}`);
+    } else if (n.fromUser?._id || n.fromUser) {
+      const targetId = n.fromUser?._id || n.fromUser;
+      navigate(`/user/${targetId}`);
     }
   };
 
   if (loading) {
     return (
-      <div className="max-w-2xl mx-auto mt-2 p-4 space-y-3">
-        <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-2"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+      <div className="max-w-2xl mx-auto mt-2 p-4 space-y-3 text-left">
+        <div className="bg-white p-5 rounded-md border border-gray-200 shadow-xs animate-pulse">
+          <div className="h-4 bg-gray-200 rounded w-1/3 mb-2"></div>
         </div>
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5 space-y-4">
+        <div className="bg-white rounded-md border border-gray-200 shadow-xs p-5 space-y-4">
           {[1, 2, 3].map(i => (
             <div key={i} className="flex gap-4 items-center animate-pulse">
-              <div className="w-10 h-10 bg-gray-200 rounded-xl"></div>
+              <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
               <div className="flex-1 space-y-2">
                 <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/4"></div>
               </div>
             </div>
           ))}
@@ -132,17 +151,15 @@ export default function Notifications() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-2 p-4 space-y-4">
-      {/* Header Card */}
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <h1 className="text-xl font-bold text-[#0f172a] tracking-tight">Notifications</h1>
-        <p className="text-sm text-slate-500 mt-1">Recent activity from your network.</p>
+    <div className="max-w-2xl mx-auto mt-2 p-0 md:p-4 space-y-2 text-left animate-fadeIn">
+      <div className="bg-white p-4 rounded-none md:rounded-md border border-gray-200 shadow-xs">
+        <h1 className="text-base font-bold text-[#0f172a] tracking-tight">Notifications</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Recent activity from your network updates channel.</p>
       </div>
 
-      {/* Dynamic Notification Stack */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden divide-y divide-gray-100">
+      <div className="bg-white rounded-none md:rounded-md border border-gray-200 shadow-xs overflow-hidden divide-y divide-gray-100">
         {notifications.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 text-sm">
+          <div className="text-center py-12 text-slate-400 text-xs font-semibold">
             No recent activity found.
           </div>
         ) : (
@@ -150,33 +167,30 @@ export default function Notifications() {
             <div 
               key={n._id}
               onClick={() => handleRowClick(n)}
-              className="p-5 flex gap-4 items-start hover:bg-slate-50/70 transition-all cursor-pointer group"
+              className="p-4 flex gap-4 items-start hover:bg-slate-50/70 transition-all cursor-pointer group animate-fadeIn"
             >
-              {/* Left Aligned Dynamic SVG Icon */}
-              <div className="p-2 bg-slate-50 rounded-xl flex-shrink-0 group-hover:bg-white transition-colors border border-gray-100 shadow-2xs">
+              <div className="p-2 bg-slate-50 rounded-md flex-shrink-0 group-hover:bg-white border border-gray-100">
                 {getNotificationIcon(n.type)}
               </div>
 
-              {/* Central Text Area */}
               <div className="flex-1 space-y-0.5 pt-0.5">
-                <div className="text-sm text-slate-700 leading-relaxed">
+                <div className="text-xs text-slate-700 leading-normal">
                   {n.fromUser ? (
                     <>
                       <span 
-                        onClick={(e) => handleProfileClick(e, n.fromUser._id)}
-                        className="font-bold text-slate-900 hover:text-blue-600 hover:underline transition-colors cursor-pointer mr-1"
+                        onClick={(e) => handleProfileClick(e, n.fromUser._id || n.fromUser)}
+                        className="font-bold text-slate-900 hover:text-blue-600 transition-colors cursor-pointer mr-1"
                       >
-                        {n.fromUser.name}
+                        {n.fromUser.name || "A member"}
                       </span>
                       <span className="text-slate-600 font-medium">{n.message}</span>
                     </>
                   ) : (
-                    <span className="text-slate-800 font-medium">{n.message}</span>
+                    <span className="text-slate-800 font-semibold">{n.message}</span>
                   )}
                 </div>
                 
-                {/* Dynamic Calculated Time */}
-                <span className="text-xs text-slate-400 font-medium block pt-0.5">
+                <span className="text-[10px] text-slate-400 font-bold block pt-0.5">
                   {formatTime(n.createdAt)}
                 </span>
               </div>

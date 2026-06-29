@@ -3,7 +3,7 @@ const router = express.Router();
 const protect = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Post = require('../models/Post');
-const Notification = require('../models/Notification'); // 🚀 1. NOTIFICATION MODEL IMPORT
+const Notification = require('../models/Notification'); 
 
 // 1. DISCOVER: Get users to connect with (excluding yourself)
 router.get('/discover', protect, async (req, res) => {
@@ -20,7 +20,7 @@ router.get('/discover', protect, async (req, res) => {
   }
 });
 
-// 2. FOLLOW / UNFOLLOW TOGGLE MATRIX FIXED! 🔄
+// 2. FOLLOW / UNFOLLOW TOGGLE MATRIX (FIXED IN STEALTH MODE) 🔄
 router.post('/follow/:id', protect, async (req, res) => {
   try {
     const currentUserId = req.user.id ? req.user.id : req.user;
@@ -35,37 +35,70 @@ router.post('/follow/:id', protect, async (req, res) => {
 
     if (!targetUser) return res.status(404).json({ msg: "User not found" });
 
-    // Arrays initialization check safety lock
     if (!currentUser.following) currentUser.following = [];
     if (!targetUser.followers) targetUser.followers = [];
 
-    // Check if currently following
     const isAlreadyFollowing = currentUser.following.map(id => id.toString()).includes(targetUserId.toString());
 
+    // 💬 Fetch active Socket.io instance from the Express app instance
+    const io = req.app.get('io');
+
     if (isAlreadyFollowing) {
-      // ❌ ALREADY FOLLOWING: Perform UNFOLLOW actions (Pull operation)
+      // ❌ ALREADY FOLLOWING: Perform UNFOLLOW actions
       currentUser.following = currentUser.following.filter(id => id.toString() !== targetUserId.toString());
       targetUser.followers = targetUser.followers.filter(id => id.toString() !== currentUserId.toString());
 
       await currentUser.save();
       await targetUser.save();
 
+      // 🚀 STEALTH WIPE: Delete the follow notification entry instantly (UNSEND)
+      await Notification.deleteOne({
+        recipient: targetUserId,
+        fromUser: currentUserId.toString(),
+        type: 'follow'
+      });
+
+      // 💬 SOCKET REALTIME ROLLBACK: Notify client layout stream to decrement badge counter instantly
+      if (io) {
+        io.to(targetUserId.toString()).emit('delete_notification', {
+          fromUser: currentUserId.toString(),
+          type: 'follow'
+        });
+      }
+
       return res.json({ msg: "Successfully unfollowed user", following: currentUser.following });
     } else {
-      // 🎯 NOT FOLLOWING YET: Perform FOLLOW actions (Push operation)
+      // 🎯 NOT FOLLOWING YET: Perform FOLLOW actions
       currentUser.following.push(targetUserId);
       targetUser.followers.push(currentUserId);
 
       await currentUser.save();
       await targetUser.save();
 
-      // ✨ TRIGGER: Follow Notification Create Karo (Sirf follow karne par)
-      await Notification.create({
-        recipient: targetUserId,              // Jisko follow kiya
-        fromUser: currentUserId.toString(),   // Jisne follow kiya
-        type: 'follow',
-        message: 'started following you.'
+      // 🚀 DUPLICATION PREVENTER: Purana notification check karo to avoid spams
+      const preExistingLog = await Notification.findOne({
+        recipient: targetUserId,
+        fromUser: currentUserId.toString(),
+        type: 'follow'
       });
+
+      if (!preExistingLog) {
+        const newNotification = await Notification.create({
+          recipient: targetUserId,
+          fromUser: currentUserId.toString(),
+          type: 'follow',
+          message: 'started following you.'
+        });
+
+        // 💬 SOCKET REALTIME PUSH: Alert receiver safely into their custom private room channel
+        if (io) {
+          io.to(targetUserId.toString()).emit('new_notification', {
+            _id: newNotification._id,
+            type: 'follow',
+            fromUser: currentUserId.toString()
+          });
+        }
+      }
 
       return res.json({ msg: "Successfully followed user", following: currentUser.following });
     }
@@ -83,7 +116,6 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
     const { message } = req.body;
 
     const targetUser = await User.findById(targetUserId);
-
     if (!targetUser) return res.status(404).json({ msg: "User not found" });
 
     if (targetUser.role !== 'official') {
@@ -106,13 +138,22 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
 
     await targetUser.save();
 
-    // ✨ TRIGGER: Mentorship Request Notification Create Karo
-    await Notification.create({
-      recipient: targetUserId,              // Official jise request bheji
-      fromUser: currentUserId.toString(),   // Aspirant jisne request ki
+    const newNotification = await Notification.create({
+      recipient: targetUserId,
+      fromUser: currentUserId.toString(),
       type: 'mentorship_request',
       message: 'wants to connect with you for mentorship.'
     });
+
+    // Sockets push alert for mentorship request
+    const io = req.app.get('io');
+    if (io) {
+      io.to(targetUserId.toString()).emit('new_notification', {
+        _id: newNotification._id,
+        type: 'mentorship_request',
+        fromUser: currentUserId.toString()
+      });
+    }
 
     res.json({ msg: "Guidance request sent successfully!" });
   } catch (err) {
@@ -127,7 +168,6 @@ router.get('/user/:id', protect, async (req, res) => {
     const targetUserId = req.params.id;
 
     const profile = await User.findById(targetUserId).select('-password -email');
-    
     if (!profile) {
       return res.status(404).json({ msg: "User not found" });
     }
@@ -140,7 +180,6 @@ router.get('/user/:id', protect, async (req, res) => {
         profile: profile, 
         posts: posts 
     });
-
   } catch (err) {
     console.error("Creator Page Error:", err.message);
     if (err.kind === 'ObjectId') {
