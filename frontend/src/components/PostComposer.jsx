@@ -32,12 +32,6 @@ export default function PostComposer({ onPostSuccess }) {
     if (token) fetchUserInitials();
   }, [token]);
 
-  const getInitials = (nameStr) => {
-    if (!nameStr) return "SH";
-    const clean = nameStr.trim().split(' ');
-    return clean.length >= 2 ? (clean[0][0] + clean[1][0]).toUpperCase() : clean[0][0].toUpperCase();
-  };
-
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -85,7 +79,6 @@ export default function PostComposer({ onPostSuccess }) {
         body: formData 
       });
       
-      // ✨ SAFE PARSING LAYER: HTML dump response text leak checker
       const contentType = res.headers.get("content-type");
       if (!contentType || !contentType.includes("application/json")) {
         const rawTextError = await res.text();
@@ -115,11 +108,14 @@ export default function PostComposer({ onPostSuccess }) {
     <div className="bg-white p-4 rounded-2xl border border-slate-150 shadow-sm mb-6 text-left">
       <form onSubmit={handleSubmit} className="space-y-3">
         <div className="flex gap-3">
-          <div className="w-11 h-11 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold flex-shrink-0 text-sm tracking-wide shadow-sm uppercase overflow-hidden border border-slate-200">
+          {/* 🚀 FIXED LOGIC LAYER: Replaced initial strings generator with sleek SVG vectors placeholder */}
+          <div className="w-11 h-11 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center flex-shrink-0 shadow-xs overflow-hidden border border-slate-200">
             {userAvatar ? (
               <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
             ) : (
-              getInitials(userName)
+              <svg className="w-6 h-6 text-slate-400" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+              </svg>
             )}
           </div>
           

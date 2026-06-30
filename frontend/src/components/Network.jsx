@@ -9,10 +9,10 @@ export default function Network() {
   const [users, setUsers] = useState([]);
   const [followedUsers, setFollowedUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  
   const [activeTab, setActiveTab] = useState('All');
-  const tabs = ['All', 'Government Official', 'Exam Aspirant', 'Creator / Institute'];
+  const [processingId, setProcessingId] = useState(null); // 🚀 UI LOCK STATE
   
+  const tabs = ['All', 'Government Official', 'Exam Aspirant', 'Creator / Institute'];
   const token = localStorage.getItem('token');
 
   const getInitials = (name) => {
@@ -56,6 +56,11 @@ export default function Network() {
 
   const handleFollowToggle = async (id) => {
     const targetIdStr = id.toString();
+    
+    // 🚀 TRANSACTION SECURITY LOCK: Click streams reject right away if processing
+    if (processingId) return;
+    setProcessingId(targetIdStr);
+
     const isCurrentlyFollowing = followedUsers.includes(targetIdStr);
     
     try {
@@ -67,7 +72,6 @@ export default function Network() {
       if (res.ok) {
         const resData = await res.json();
         
-        // 🔄 Sync arrays using pure reference validation list from DB
         if (resData.following) {
           const updatedIds = resData.following.map(uid => (uid._id || uid).toString());
           setFollowedUsers(updatedIds);
@@ -86,6 +90,8 @@ export default function Network() {
     } catch (err) {
       toast.error("Network sync broke down.");
       console.error(err);
+    } finally {
+      setProcessingId(null); // 🚀 RELEASE UI LOCK
     }
   };
 
@@ -100,7 +106,7 @@ export default function Network() {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto mt-2 px-4 text-left">
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mb-4">
+        <div className="bg-white p-6 rounded-md border border-gray-100 shadow-sm mb-4">
           <div className="h-6 bg-gray-200 rounded w-1/4 mb-2 animate-pulse"></div>
           <div className="h-4 bg-gray-200 rounded w-2/3 animate-pulse"></div>
         </div>
@@ -113,21 +119,21 @@ export default function Network() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto mt-2 p-4 space-y-4 text-left">
-      <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
-        <h1 className="text-xl font-bold text-[#0f172a] tracking-tight">Discover the network</h1>
-        <p className="text-sm text-slate-500 mt-1">Verified officials, fellow aspirants and trusted institutes.</p>
+    <div className="max-w-4xl mx-auto mt-2 p-0 md:p-4 space-y-2 text-left animate-fadeIn">
+      <div className="bg-white p-4 rounded-none md:rounded-md border border-gray-200 shadow-xs">
+        <h1 className="text-base font-bold text-[#0f172a] tracking-tight">Discover the network</h1>
+        <p className="text-xs text-slate-500 mt-0.5">Verified officials, fellow aspirants and trusted institutes.</p>
       </div>
       
-      <div className="flex bg-white p-1.5 rounded-xl border border-gray-200 shadow-sm overflow-x-auto hide-scrollbar gap-1">
+      <div className="flex bg-white p-1 rounded-none md:rounded-md border border-gray-200 shadow-xs overflow-x-auto hide-scrollbar gap-1">
         {tabs.map(tab => (
           <button 
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-xs md:text-sm font-semibold rounded-lg transition-all flex-shrink-0 ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-all flex-shrink-0 ${
               activeTab === tab 
-                ? 'bg-[#1e293b] text-white shadow-sm' 
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                ? 'bg-[#1e293b] text-white shadow-xs' 
+                : 'text-slate-500 hover:bg-slate-50'
             }`}
           >
             {tab}
@@ -136,28 +142,30 @@ export default function Network() {
       </div>
 
       {filteredUsers.length === 0 ? (
-        <div className="text-center py-10 bg-white rounded-2xl border border-gray-200 shadow-sm text-slate-400 text-sm font-medium">
+        <div className="text-center py-10 bg-white rounded-none md:rounded-md border border-gray-200 shadow-xs text-slate-400 text-xs font-medium">
           No profiles found in this category.
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           {filteredUsers.map(u => {
             const isFollowing = followedUsers.includes(u._id.toString());
+            const isTargetProcessing = processingId === u._id.toString();
+
             return (
-              <div key={u._id} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div key={u._id} className="bg-white p-4 rounded-none md:rounded-md border border-gray-200 shadow-xs flex flex-col justify-between hover:shadow-xs transition-shadow">
                 
-                <div className="flex gap-4 items-start mb-4">
+                <div className="flex gap-3 items-start mb-3">
                   <div className="relative flex-shrink-0 cursor-pointer" onClick={() => navigate(`/user/${u._id}`)}>
                     {u.avatar ? (
-                      <img src={u.avatar} alt={u.name} className="w-16 h-16 rounded-full object-cover border border-slate-100" />
+                      <img src={u.avatar} alt={u.name} className="w-12 h-12 rounded-full object-cover border border-slate-100" />
                     ) : (
-                      <div className="w-16 h-16 bg-[#2563eb] text-white flex items-center justify-center rounded-full text-xl font-bold tracking-wide">
+                      <div className="w-12 h-12 bg-[#2563eb] text-white flex items-center justify-center rounded-full text-sm font-bold">
                         {getInitials(u.name)}
                       </div>
                     )}
                     {u.role === 'official' && (
-                      <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5 shadow-sm">
-                        <svg className="w-4 h-4 text-[#2563eb] fill-current" viewBox="0 0 20 20">
+                      <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5 shadow-xs">
+                        <svg className="w-3.5 h-3.5 text-[#2563eb] fill-current" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                         </svg>
                       </div>
@@ -167,24 +175,20 @@ export default function Network() {
                   <div className="space-y-0.5">
                     <h2 
                       onClick={() => navigate(`/user/${u._id}`)}
-                      className="font-bold text-base text-slate-900 leading-snug hover:text-blue-600 cursor-pointer transition-colors"
+                      className="font-bold text-[13.5px] text-slate-900 leading-none hover:text-blue-600 cursor-pointer transition-colors"
                     >
                       {u.name}
                     </h2>
-                    <p className="text-xs text-slate-700 font-medium line-clamp-2">
+                    <p className="text-[11.5px] text-slate-600 font-medium line-clamp-1">
                       {u.tagline || `${u.jobTitle || 'Member'} ${u.department ? `at ${u.department}` : ''}`}
                     </p>
                     
-                    <div className="flex items-center gap-1 text-slate-400 text-[11px] pt-0.5">
-                      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                    <div className="flex items-center gap-1 text-slate-400 text-[10px]">
                       <span>{u.city ? `${u.city}, ${u.state || ''}` : u.location || 'India'}</span>
                     </div>
 
-                    <div className="pt-1.5">
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${
+                    <div className="pt-0.5">
+                      <span className={`inline-block px-2 py-0.5 rounded-sm text-[9px] font-black tracking-wide ${
                         u.role === 'official' ? 'bg-[#0f172a] text-white' : 
                         u.role === 'creator' ? 'bg-[#ca8a04] text-white' : 'bg-[#00875a] text-white'
                       }`}>
@@ -197,13 +201,15 @@ export default function Network() {
                 <div className="flex gap-2 w-full pt-1">
                   <button 
                     onClick={() => handleFollowToggle(u._id)}
-                    className={`flex-1 py-2 rounded-lg text-xs font-bold transition shadow-sm flex items-center justify-center gap-1 ${
+                    disabled={isTargetProcessing} // 🚀 RENDER LOCK DURING API CALL
+                    className={`flex-1 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1 ${
+                      isTargetProcessing ? 'opacity-50 cursor-not-allowed bg-gray-100' :
                       isFollowing 
-                        ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-700 hover:border-slate-300' 
+                        ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50' 
                         : 'bg-[#1e293b] text-white hover:bg-slate-800'
                     }`}
                   >
-                    {isFollowing ? (
+                    {isTargetProcessing ? 'Syncing...' : isFollowing ? (
                       <>
                         <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
@@ -215,7 +221,7 @@ export default function Network() {
                   
                   <button 
                     onClick={() => navigate(`/user/${u._id}`)}
-                    className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg text-xs font-bold transition"
+                    className="flex-1 py-1.5 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 rounded text-xs font-bold transition"
                   >
                     View profile
                   </button>

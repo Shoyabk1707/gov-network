@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Navbar({ handleLogout, onOpenDrawer, currentUser, unreadCount }) {
+export default function Navbar({ handleLogout, onOpenDrawer, currentUser }) {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
 
@@ -22,15 +22,18 @@ export default function Navbar({ handleLogout, onOpenDrawer, currentUser, unread
         
         {/* 👤 1. LEFT CORNER: Mobile Avatar Drawer Trigger & Desktop Branding Logo */}
         <div className="flex items-center flex-shrink-0">
-          {/* Mobile Profile Trigger Button - Hooked to currentUser state */}
+          {/* Mobile Profile Trigger Button - Hooked to profile pic avatar icon cleanly */}
           <button 
             onClick={onOpenDrawer}
-            className="md:hidden w-8 h-8 rounded-full bg-slate-900 text-white font-black flex items-center justify-center text-xs uppercase overflow-hidden shadow-xs border border-gray-100 flex-shrink-0"
+            className="md:hidden w-8 h-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center overflow-hidden shadow-xs border border-gray-200 flex-shrink-0"
           >
             {displayAvatar ? (
               <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
             ) : (
-              displayName.charAt(0).toUpperCase()
+              // 🚀 CLEAN PROFESSIONAL AVATAR ICON INSTEAD OF NAME INITIAL LETTER
+              <svg className="w-5 h-5 text-slate-400" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+              </svg>
             )}
           </button>
 
@@ -71,14 +74,14 @@ export default function Navbar({ handleLogout, onOpenDrawer, currentUser, unread
 
         {/* 💬 3. RIGHT CORNER: Direct Redirection Actions System */}
         <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-          {/* 🚀 FIXED LOGO MATRIX: Exact LinkedIn Rounded Bubble & Tail Framework Layer */}
+          {/* MESSAGES TRIGGER: Hidden on desktop platforms */}
           <button 
             onClick={() => navigate('/messages')}
-            className="p-1 text-[#8c8c8c] hover:text-[#5c5c5c] active:scale-95 transition-all duration-150 flex items-center justify-center"
+            className="md:hidden p-1 text-[#8c8c8c] hover:text-[#5c5c5c] active:scale-95 transition-all duration-150 flex items-center justify-center"
             title="Open Inbox Messages"
           >
             <svg 
-              className="w-6 h-6 md:w-6.5 md:h-6.5" 
+              className="w-6 h-6" 
               viewBox="0 0 24 24" 
               fill="currentColor" 
               xmlns="http://www.w3.org/2000/svg"
@@ -88,22 +91,6 @@ export default function Navbar({ handleLogout, onOpenDrawer, currentUser, unread
               <circle cx="12" cy="10.25" r="1" fill="white" />
               <circle cx="16" cy="10.25" r="1" fill="white" />
             </svg>
-          </button>
-
-          {/* 🚀 DESKTOP EXCLUSIVE NOTIFICATIONS TRIGGER: Floating badge controller logic */}
-          <button 
-            onClick={() => navigate('/notifications')}
-            className="hidden md:flex p-1 text-[#8c8c8c] hover:text-[#5c5c5c] relative items-center justify-center transition-all duration-150"
-            title="Notifications Panel"
-          >
-            <svg className="w-[22px] h-[22px] md:w-[23px] md:h-[23px]" fill="none" stroke="currentColor" strokeWidth="2.3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white font-sans font-bold text-[9px] w-3.5 h-3.4 rounded-full flex items-center justify-center shadow-sm border border-white scale-105 animate-pulse">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
           </button>
 
           {/* Desktop Exclusive Sign-Out Option */}
