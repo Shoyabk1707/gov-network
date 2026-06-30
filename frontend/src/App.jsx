@@ -1,8 +1,9 @@
-import { useState, useEffect, createContext } from 'react';
+import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate, Navigate, useParams, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { io } from 'socket.io-client'; // 🚀 SOCKET CLIENT INITIALIZED
 import { API_BASE_URL } from './config';
+import { SocketProvider, SocketContext } from './context/SocketContext'; // 🚀 IMPORT CENTRALIZED PRODUCER HOOKS
+import { useContext } from 'react';
 
 // Components
 import Navbar from './components/Navbar'; 
@@ -23,9 +24,6 @@ import RightSidebar from './components/RightSidebar';
 import BottomNav from './components/BottomNav';
 import Messages from './components/Messages';
 
-// 🚀 CREATE EXPORTABLE GLOBAL SOCKET CONTEXT
-export const SocketContext = createContext(null);
-
 const MobileDrawer = ({ isOpen, onClose, handleLogout, currentUser }) => {
   if (!isOpen) return null;
 
@@ -38,11 +36,13 @@ const MobileDrawer = ({ isOpen, onClose, handleLogout, currentUser }) => {
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white w-[260px] h-full flex flex-col shadow-xl text-left animate-slideInLeft transition-all duration-200">
         <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <div className="w-12 h-12 rounded-full bg-slate-900 text-white font-bold flex items-center justify-center text-base uppercase mb-2 overflow-hidden border border-gray-300">
+          <div className="w-12 h-12 rounded-full bg-slate-100 text-white font-bold flex items-center justify-center text-base uppercase mb-2 overflow-hidden border border-gray-300">
             {displayAvatar ? (
               <img src={displayAvatar} alt={displayName} className="w-full h-full object-cover" />
             ) : (
-              displayName[0].toUpperCase()
+              <svg className="w-6 h-6 text-slate-400" fill="currentColor" viewBox="0 0 24 24">
+                <path fillRule="evenodd" d="M7.5 6a4.5 4.5 0 119 0 4.5 4.5 0 01-9 0zM3.751 20.105a8.25 8.25 0 0116.498 0 .75.75 0 01-.437.695A18.683 18.683 0 0112 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 01-.437-.695z" clipRule="evenodd" />
+              </svg>
             )}
           </div>
           <h3 className="font-bold text-gray-900 text-sm leading-tight">{displayName}</h3>
@@ -57,7 +57,6 @@ const MobileDrawer = ({ isOpen, onClose, handleLogout, currentUser }) => {
             <span>🏢</span> Company Pages
           </a>
           <div className="border-b border-gray-100 my-1" />
-          <div className="px-4 py-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Analytics</div>
           <div className="px-4 py-1 flex justify-between text-xs font-medium text-gray-500">
             <span>Profile viewers</span>
             <span className="text-blue-600 font-bold">25</span>
@@ -77,12 +76,14 @@ const MobileDrawer = ({ isOpen, onClose, handleLogout, currentUser }) => {
   );
 };
 
-// 🚀 FIXED PROPS INJECTION: Received counts states from parent context
-const AuthenticatedLayout = ({ children, handleLogout, unreadCount, setUnreadCount }) => {
+const AuthenticatedLayout = ({ children, handleLogout }) => {
   const location = useLocation();
   const isMessagesPage = location.pathname === '/messages';
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  
+  // 🚀 EXTRACT REALTIME CENTRAL COUNTS GLOBALLY
+  const { unreadCount } = useContext(SocketContext);
 
   useEffect(() => {
     const fetchRealUserProfileData = async () => {
@@ -116,7 +117,6 @@ const AuthenticatedLayout = ({ children, handleLogout, unreadCount, setUnreadCou
         handleLogout={handleLogout} 
         onOpenDrawer={() => setDrawerOpen(true)} 
         currentUser={currentUser}
-        unreadCount={unreadCount} // 🚀 Desktop realtime count badge link
       />
       
       <MobileDrawer 
@@ -142,7 +142,7 @@ const AuthenticatedLayout = ({ children, handleLogout, unreadCount, setUnreadCou
         )}
       </main>
 
-      {/* 🚀 FIXED FOR MOBILE SYSTEM: Passed unreadCount states directly to bottom navigation tray */}
+      {/* 🚀 LIVE INDICATOR EMBEDDED SAFELY */}
       <BottomNav unreadCount={unreadCount} />
     </div>
   );
@@ -150,64 +150,11 @@ const AuthenticatedLayout = ({ children, handleLogout, unreadCount, setUnreadCou
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  const [socket, setSocket] = useState(null);
-  const [unreadCount, setUnreadCount] = useState(0); // 🚀 LIVE BADGE LAYER
   const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      if (socket) socket.disconnect();
-      return;
-    }
-
-    const socketInstance = io(API_BASE_URL, {
-      withCredentials: true,
-      transports: ['websocket', 'polling']
-    });
-
-    setSocket(socketInstance);
-
-    try {
-      const token = localStorage.getItem('token');
-      const payload = JSON.parse(window.atob(token.split('.')[1]));
-      const userId = payload.id || payload._id;
-
-      if (userId) {
-        socketInstance.emit('setup_session', userId);
-      }
-
-      fetch(`${API_BASE_URL}/api/notifications/unread-counts`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data.unreadNotifications !== undefined) {
-          setUnreadCount(data.unreadNotifications);
-        }
-      }).catch(err => console.error("Badges fetch failure:", err));
-
-    } catch (e) {
-      console.error("Token session extraction error:", e);
-    }
-
-    // 🚀 LISTENERS WIRE: Sockets listeners updating badge arrays reactively
-    socketInstance.on('new_notification', () => {
-      setUnreadCount(prev => prev + 1); 
-    });
-
-    socketInstance.on('delete_notification', () => {
-      setUnreadCount(prev => Math.max(0, prev - 1)); 
-    });
-
-    return () => {
-      socketInstance.disconnect();
-    };
-  }, [isAuthenticated]);
 
   const handleLogout = () => {
     localStorage.clear(); 
     setIsAuthenticated(false);
-    if (socket) socket.disconnect();
     navigate('/login');
   };
 
@@ -216,32 +163,32 @@ function App() {
   };
 
   return (
-    <SocketContext.Provider value={socket}>
+    <SocketProvider>
       <Toaster position="bottom-center" />
 
       <Routes>
         <Route path="/post/:id" element={
           isAuthenticated ? (
-            <AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><SinglePostView /></AuthenticatedLayout>
+            <AuthenticatedLayout handleLogout={handleLogout}><SinglePostView /></AuthenticatedLayout>
           ) : (
             <div className="min-h-screen bg-[#F3F2EF] py-10"><SinglePostView /></div>
           )
         } />
 
-        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><Feed /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><Network /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/user/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><UserProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><Notifications setUnreadCount={setUnreadCount} /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/messages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><Messages /></AuthenticatedLayout></ProtectedRoute>} />        
-        <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
-        <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout} unreadCount={unreadCount} setUnreadCount={setUnreadCount}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Feed /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Profile /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/network" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Network /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/user/:userId" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><UserProfileWrapper /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/notifications" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Notifications /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/messages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><Messages /></AuthenticatedLayout></ProtectedRoute>} />        
+        <Route path="/pages" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><ManagePages onBack={() => navigate('/')} /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/page/:id" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><PageProfile /></AuthenticatedLayout></ProtectedRoute>} />
+        <Route path="/search" element={<ProtectedRoute><AuthenticatedLayout handleLogout={handleLogout}><SearchResults /></AuthenticatedLayout></ProtectedRoute>} />
         
         <Route path="/login" element={!isAuthenticated ? <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4"><Auth /></div> : <Navigate to="/" replace />} />
         <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
       </Routes>
-    </SocketContext.Provider>
+    </SocketProvider>
   );
 }
 

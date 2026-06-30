@@ -1,47 +1,91 @@
 const Notification = require('../models/Notification');
+const mongoose = require('mongoose');
 
 // ==========================================
-// 📊 ACTION 1: GET LIVE NAVBAR BADGE COUNTS 
+// 📊 ACTION 1: INITIAL COUNTS READ ENGINE
 // ==========================================
 const getUnreadCounts = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id || req.user;
 
-    // Database search parsing flags set to false safely
     const unreadNotifications = await Notification.countDocuments({ 
-      recipient: userId, 
+      recipient: new mongoose.Types.ObjectId(userId.toString()), 
       isRead: false 
     });
 
     res.status(200).json({
       unreadNotifications: unreadNotifications,
-      unreadMessages: 0 // Hooked cleanly to message model schemas later
+      unreadMessages: 0 
     });
   } catch (error) {
     console.error('Fetch Badges Error:', error.message);
-    res.status(500).json({ message: 'Server context transaction error.' });
+    res.status(500).json({ message: 'Server badges context sequence fault.' });
   }
 };
 
 // ==========================================
-// 📡 ACTION 2: FETCH ALL NOTIFICATIONS LOGS
+// 📡 ACTION 2: FETCH REALTIME SYSTEM AGGREGATES LOGS
 // ==========================================
 const getNotifications = async (req, res) => {
   try {
     const userId = req.user?._id || req.user?.id || req.user;
 
-    const notifications = await Notification.find({ recipient: userId })
-      .populate('fromUser', 'name role avatar') // Added avatar population buffer support
-      .sort({ createdAt: -1 });
+    // Aggressive database filtering: Groups matching traces down instantly
+    const cleanLogs = await Notification.aggregate([
+      { 
+        $match: { 
+          recipient: new mongoose.Types.ObjectId(userId.toString()) 
+        } 
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: {
+            fromUser: "$fromUser",
+            type: "$type",
+            postId: "$postId" // Isolate loops to prevent merging actions on different streams
+          },
+          latestRecord: { $first: "$$ROOT" }
+        }
+      },
+      { $replaceRoot: { newRoot: "$latestRecord" } },
+      { $sort: { createdAt: -1 } }
+    ]);
 
-    res.json(notifications);
+    // Data collections framework execution mapper safe parsing
+    const populatedLogs = await Notification.populate(cleanLogs, {
+      path: 'fromUser',
+      select: 'name role avatar'
+    });
+
+    res.json(populatedLogs);
   } catch (error) {
-    console.error('Fetch Notifications Error:', error.message);
-    res.status(500).json({ message: 'Server Error' });
+    console.error('Fetch Clean Notifications Error:', error.message);
+    res.status(500).json({ message: 'Server database records collection fault.' });
+  }
+};
+
+// ==========================================
+// 🛠️ ACTION 3: FULL PURGE CLEAR FLUSH MATRIX
+// ==========================================
+const markNotificationsAsRead = async (req, res) => {
+  try {
+    const userId = req.user?._id || req.user?.id || req.user;
+
+    await Notification.updateMany(
+      { recipient: new mongoose.Types.ObjectId(userId.toString()), isRead: false },
+      { $set: { isRead: true } }
+    );
+
+    res.status(200).json({ success: true, message: "Notifications marked read safely." });
+  } catch (error) {
+    console.error('Bulk update indicators error:', error.message);
+    res.status(500).json({ message: 'Server synchronization data error.' });
   }
 };
 
 module.exports = { 
   getNotifications,
-  getUnreadCounts // 🚀 EXPORTED NEW VALUE HANDLER
+  getUnreadCounts,
+  markNotificationsAsRead
 };

@@ -1,15 +1,17 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config';
-import { SocketContext } from '../App'; // 🚀 HOOK SOCKET GLOBAL CONTROLLER
+import { SocketContext } from '../context/SocketContext';
 import toast from 'react-hot-toast';
 
-export default function Notifications({ setUnreadCount }) {
+export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const token = localStorage.getItem('token');
-  const socket = useContext(SocketContext); // 🚀 EXTRACT OPEN ACTIVE PIPE
+  
+  // 🚀 CENTRALIZED CONTEXT HOOK: Extracted layers without duplicate scope identifiers
+  const { socket, setUnreadCount } = useContext(SocketContext);
 
   // --- 📡 FETCH NOTIFICATIONS FROM BACKEND ---
   const fetchNotifications = async () => {
@@ -23,8 +25,14 @@ export default function Notifications({ setUnreadCount }) {
         const data = await res.json();
         setNotifications(data);
         
-        // Notifications view open hote hi system clear reset handle API fire
+        // 🚀 UI RESET LAYER: Instantly clear counter dot badge globally
         setUnreadCount(0); 
+
+        // 🚀 BACKEND FLUSH: Bulk update read states silently on server collection
+        await fetch(`${API_BASE_URL}/api/notifications/mark-as-read`, {
+          method: 'PUT',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
       }
     } catch (err) {
       console.error("Error fetching notifications:", err);
@@ -47,7 +55,6 @@ export default function Notifications({ setUnreadCount }) {
 
     // A. New Notification Appends Realtime
     socket.on('new_notification', (newLog) => {
-      // Fetch notifications list freshly or append logic safely
       setNotifications(prev => [newLog, ...prev]);
     });
 

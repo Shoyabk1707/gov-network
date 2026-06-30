@@ -4,6 +4,7 @@ const protect = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Post = require('../models/Post');
 const Notification = require('../models/Notification'); 
+const socketService = require('../services/socketService'); // 🚀 INJECT CENTRAL ARCHITECTURE SERVICE
 
 // 1. DISCOVER: Get users to connect with (excluding yourself)
 router.get('/discover', protect, async (req, res) => {
@@ -40,9 +41,6 @@ router.post('/follow/:id', protect, async (req, res) => {
 
     const isAlreadyFollowing = currentUser.following.map(id => id.toString()).includes(targetUserId.toString());
 
-    // 💬 Fetch active Socket.io instance from the Express app instance
-    const io = req.app.get('io');
-
     if (isAlreadyFollowing) {
       // ❌ ALREADY FOLLOWING: Perform UNFOLLOW actions
       currentUser.following = currentUser.following.filter(id => id.toString() !== targetUserId.toString());
@@ -58,13 +56,11 @@ router.post('/follow/:id', protect, async (req, res) => {
         type: 'follow'
       });
 
-      // 💬 SOCKET REALTIME ROLLBACK: Notify client layout stream to decrement badge counter instantly
-      if (io) {
-        io.to(targetUserId.toString()).emit('delete_notification', {
-          fromUser: currentUserId.toString(),
-          type: 'follow'
-        });
-      }
+      // 💬 SOCKET ENTERPRISE EMIT: Realtime layout synchronization update matrix
+      socketService.emitToUser(targetUserId.toString(), 'delete_notification', {
+        fromUser: currentUserId.toString(),
+        type: 'follow'
+      });
 
       return res.json({ msg: "Successfully unfollowed user", following: currentUser.following });
     } else {
@@ -75,14 +71,7 @@ router.post('/follow/:id', protect, async (req, res) => {
       await currentUser.save();
       await targetUser.save();
 
-      // 🚀 DUPLICATION PREVENTER: Purana notification check karo to avoid spams
-      const preExistingLog = await Notification.findOne({
-        recipient: targetUserId,
-        fromUser: currentUserId.toString(),
-        type: 'follow'
-      });
-
-      if (!preExistingLog) {
+      try {
         const newNotification = await Notification.create({
           recipient: targetUserId,
           fromUser: currentUserId.toString(),
@@ -90,14 +79,15 @@ router.post('/follow/:id', protect, async (req, res) => {
           message: 'started following you.'
         });
 
-        // 💬 SOCKET REALTIME PUSH: Alert receiver safely into their custom private room channel
-        if (io) {
-          io.to(targetUserId.toString()).emit('new_notification', {
-            _id: newNotification._id,
-            type: 'follow',
-            fromUser: currentUserId.toString()
-          });
-        }
+        // 💬 SOCKET ENTERPRISE EMIT: Direct real-time push to private room channel
+        socketService.emitToUser(targetUserId.toString(), 'new_notification', {
+          _id: newNotification._id,
+          type: 'follow',
+          fromUser: currentUserId.toString()
+        });
+      } catch (dbError) {
+        // Compound uniqueness constraints lock catches race condition triggers safely here
+        console.log("🔒 Unique constraint index layer securely blocked duplicate entry duplication.");
       }
 
       return res.json({ msg: "Successfully followed user", following: currentUser.following });
@@ -145,15 +135,12 @@ router.post('/request-guidance/:id', protect, async (req, res) => {
       message: 'wants to connect with you for mentorship.'
     });
 
-    // Sockets push alert for mentorship request
-    const io = req.app.get('io');
-    if (io) {
-      io.to(targetUserId.toString()).emit('new_notification', {
-        _id: newNotification._id,
-        type: 'mentorship_request',
-        fromUser: currentUserId.toString()
-      });
-    }
+    // 🚀 SOCKET ENTERPRISE EMIT: Central service alert push
+    socketService.emitToUser(targetUserId.toString(), 'new_notification', {
+      _id: newNotification._id,
+      type: 'mentorship_request',
+      fromUser: currentUserId.toString()
+    });
 
     res.json({ msg: "Guidance request sent successfully!" });
   } catch (err) {

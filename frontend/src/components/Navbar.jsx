@@ -1,9 +1,13 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { SocketContext } from '../context/SocketContext'; // 🚀 INJECT CONTEXT HOOK
 
 export default function Navbar({ handleLogout, onOpenDrawer, currentUser }) {
   const navigate = useNavigate();
   const [searchInput, setSearchInput] = useState('');
+  
+  // 🚀 EXTRACT REALTIME MESSAGE COUNTER GLOBALLY
+  const { unreadMessagesCount, setUnreadMessagesCount } = useContext(SocketContext);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -74,14 +78,20 @@ export default function Navbar({ handleLogout, onOpenDrawer, currentUser }) {
 
         {/* 💬 3. RIGHT CORNER: Direct Redirection Actions System */}
         <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-          {/* MESSAGES TRIGGER: Hidden on desktop platforms */}
+          {/* 🚀 RESPONSIVE CHAT LINK (MESSAGES TRIGGER): 
+              Visible on ALL breakpoints now to support multi-platform workflows.
+              Clears the global message badge instantly on navigation click event. */}
           <button 
-            onClick={() => navigate('/messages')}
-            className="md:hidden p-1 text-[#8c8c8c] hover:text-[#5c5c5c] active:scale-95 transition-all duration-150 flex items-center justify-center"
+            onClick={() => {
+              setSearchInput('');
+              setUnreadMessagesCount(0); // Clear badge indicator on entry click safely
+              navigate('/messages');
+            }}
+            className="p-1 text-[#8c8c8c] hover:text-[#5c5c5c] active:scale-95 transition-all duration-150 flex items-center justify-center relative"
             title="Open Inbox Messages"
           >
             <svg 
-              className="w-6 h-6" 
+              className="w-6 h-6 md:w-[25px] md:h-[25px]" 
               viewBox="0 0 24 24" 
               fill="currentColor" 
               xmlns="http://www.w3.org/2000/svg"
@@ -91,6 +101,13 @@ export default function Navbar({ handleLogout, onOpenDrawer, currentUser }) {
               <circle cx="12" cy="10.25" r="1" fill="white" />
               <circle cx="16" cy="10.25" r="1" fill="white" />
             </svg>
+
+            {/* 🚀 REAL-TIME GLOBAL CHET BADGE PIN: Absolute floating position container element */}
+            {unreadMessagesCount > 0 && (
+              <span className="absolute -top-0.5 -right-1 bg-red-500 text-white font-sans font-black text-[8px] md:text-[9px] w-3.5 h-3.5 md:w-4 md:h-4 rounded-full flex items-center justify-center border border-white shadow-xs animate-pulse">
+                {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+              </span>
+            )}
           </button>
 
           {/* Desktop Exclusive Sign-Out Option */}

@@ -1,8 +1,12 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useContext } from 'react';
+import { SocketContext } from '../context/SocketContext'; // 🚀 INJECT CONTEXT HOOK
 
-// 🚀 INJECTED UNREADCOUNT LAYER VALUE FOR REALTIME INDICATORS
 export default function BottomNav({ unreadCount }) {
   const location = useLocation();
+  
+  // 🚀 EXTRACT REALTIME VARIABLES FROM GLOBAL MANAGEMENT MATRIX
+  const { unreadMessagesCount, setUnreadMessagesCount } = useContext(SocketContext);
 
   const navItems = [
     { name: 'Home', path: '/', icon: '🏠' },
@@ -22,6 +26,10 @@ export default function BottomNav({ unreadCount }) {
           <Link 
             key={item.name} 
             to={item.path}
+            // 🚀 CLEANUP: Clear message counts if explicitly clicking a message interface option route element 
+            onClick={() => {
+              if (item.path === '/messages') setUnreadMessagesCount(0);
+            }}
             className={`flex flex-col items-center justify-center h-full flex-1 transition-all duration-150 relative ${
               isActive ? 'text-blue-600 font-black' : 'text-slate-400 font-bold'
             }`}
@@ -37,7 +45,7 @@ export default function BottomNav({ unreadCount }) {
                 {item.icon}
               </span>
               
-              {/* 🚀 MOBILE REAL-TIME BADGE PIN: Overlaps perfectly on top-right edge of the bell icon */}
+              {/* 🚀 MOBILE REAL-TIME NOTIFICATIONS BADGE PIN */}
               {isNotifications && unreadCount > 0 && (
                 <span className="absolute -top-1 -right-1.5 bg-red-500 text-white font-sans font-bold text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center border border-white shadow-xs animate-pulse">
                   {unreadCount > 9 ? '9+' : unreadCount}

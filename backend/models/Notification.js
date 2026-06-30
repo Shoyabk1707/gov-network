@@ -30,4 +30,20 @@ const notificationSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// =========================================================================
+// 🚀 ENTERPRISE SCALABILITY LAYER: COMPOUND UNIQUE CONSTRAINT MATRIX
+// =========================================================================
+// Target combo block: recipient + fromUser + type agar 'follow' hai toh unique document handle system generate hoga.
+// Is dynamic lookup filters trigger logic se pure database schema layer par duplicates generate hona absolute zero locked ho jayega.
+notificationSchema.index(
+  { recipient: 1, fromUser: 1, type: 1 },
+  { 
+    unique: true, 
+    partialFilterExpression: { type: 'follow' } 
+  }
+);
+
+// High-speed dashboard reads performance optimizer checks logic
+notificationSchema.index({ recipient: 1, isRead: 1 });
+
 module.exports = mongoose.model('Notification', notificationSchema);
