@@ -110,6 +110,11 @@ export default function Messages() {
       console.error(err);
     } finally {
       setLoadingMessages(false);
+      
+      // 🚀 PRODUCTION TRIGGER: Chat fetch hote hi browser thread ko 50ms ka gap dekar instantly bottom par push karo
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }); // Initial load par 'auto' instantaneous jump dega jo visually clean lagta hai
+      }, 50);
     }
   };
 
@@ -199,7 +204,9 @@ export default function Messages() {
   }, [activeChat]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 0) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, isRecipientTyping]);
 
   const handleInputChange = (e) => {
@@ -323,7 +330,6 @@ export default function Messages() {
     }
   };
 
-  // 🚀 NEW SECURE DOWNLOAD ENGINE: Bypasses Cloudinary 401 link security restrictions by streaming blob payload directly
   const handleSecureDownload = async (url, originalName) => {
     try {
       toast.loading("Downloading document...", { id: "doc-dl" });
@@ -378,7 +384,8 @@ export default function Messages() {
   const currentRecipient = activeChat ? getRecipientUser(activeChat) : {};
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-145px)] md:h-[calc(100vh-140px)] flex overflow-hidden animate-fadeIn text-left w-full relative">
+    // 🚀 FIXED HIGH-END CONTAINER: Locks maximum layout parameters cleanly with zero screen leaks
+    <div className="bg-white rounded-none md:rounded-2xl border border-gray-200 shadow-sm h-[calc(100vh-49px-52px)] md:h-[calc(100vh-140px)] flex overflow-hidden animate-fadeIn text-left w-full relative">
       
       {/* 📁 1. LEFT SIDE INBOX PANEL */}
       <div className={`md:w-80 lg:w-[360px] border-r border-gray-100 flex flex-col h-full bg-slate-50/50 shrink-0 w-full ${activeChat ? 'hidden md:flex' : 'flex'}`}>
@@ -444,10 +451,11 @@ export default function Messages() {
       {/* 💬 2. RIGHT CONVERSATION MODULE */}
       <div className={`flex-1 flex flex-col h-full bg-white w-full ${!activeChat ? 'hidden md:flex' : 'flex'}`}>
         {activeChat ? (
-          <div className="flex flex-col h-full w-full justify-between overflow-hidden">
+          // 🚀 FIXED HEIGHT COMPONENT GRID: Ensures strict inner view limits cleanly
+          <div className="flex flex-col h-full w-full overflow-hidden relative">
             
-            {/* Header Stream Panel */}
-            <div className="p-4 border-b border-slate-100 flex items-center bg-white shrink-0">
+            {/* 🛑 A. STATIC FIXED HEADER STREAM PANEL */}
+            <div className="p-4 border-b border-slate-100 flex items-center bg-white shrink-0 z-20 shadow-xs">
               <button onClick={() => setActiveChat(null)} className="md:hidden text-slate-500 hover:text-slate-900 mr-2 p-1 rounded-full hover:bg-slate-50">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 19l-7-7 7-7" /></svg>
               </button>
@@ -467,8 +475,8 @@ export default function Messages() {
               </div>
             </div>
 
-            {/* Message Feed Scroller Box */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40 min-h-0">
+            {/* 📜 B. DYNAMIC SCROLLABLE MESSAGE INBOX FEED CONTAINER */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/40 min-h-0 w-full z-10">
               {loadingMessages ? (
                 <div className="text-center text-xs font-semibold text-slate-400 animate-pulse pt-6">Pulling logs...</div>
               ) : (
@@ -494,6 +502,7 @@ export default function Messages() {
                           <div className={`flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all duration-150 ${isOwn ? 'order-1' : 'order-3'}`}>
                             {!msg.isDeleted && (
                               <button 
+                                type="button"
                                 onClick={() => setReplyingToMessage(msg)}
                                 className="p-1 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-transform active:scale-95"
                                 title="Reply to message"
@@ -506,6 +515,7 @@ export default function Messages() {
                             
                             {isOwn && !msg.isDeleted && (
                               <button 
+                                type="button"
                                 onClick={() => handleDeleteAction(msg._id)}
                                 className="p-1 text-slate-300 hover:text-red-500 hover:bg-slate-100 rounded-lg"
                                 title="Delete Message"
@@ -526,13 +536,13 @@ export default function Messages() {
                                 : 'bg-white text-slate-800 border border-slate-150 rounded-bl-none'
                           }`}>
                             
-                            {/* ↩️ UPDATED: WHATSAPP-STYLE QUOTED REPLIED TEXT VIEW INNER FRAME */}
+                            {/* ↩️ UPDATED: REPLIED QUOTED BOX INNER LINK */}
                             {msg.replyTo && (
                               <div className={`mb-2 p-2 rounded-lg border-l-4 text-[11px] truncate max-w-full flex flex-col text-left ${
                                 isOwn ? 'bg-white/10 text-slate-200 border-white/40' : 'bg-slate-100 text-slate-600 border-slate-400'
                               }`}>
                                 <span className="font-extrabold block text-[10px] mb-0.5 opacity-80 text-left">
-                                  ↩️ Reply to {String(msg.replyTo.sender) === String(currentUserId) ? "You" : currentRecipient.name}
+                                  Ref: Reply to {String(msg.replyTo.sender) === String(currentUserId) ? "You" : currentRecipient.name}
                                 </span>
                                 {msg.replyTo.isDeleted ? (
                                   <span className="italic">This message was deleted</span>
@@ -544,7 +554,7 @@ export default function Messages() {
                               </div>
                             )}
 
-                            {/* 📁 AIRTIGHT RENDER MATRIX */}
+                            {/* 📁 FILE LOG MATRIX ATTACHMENTS */}
                             {msg.mediaUrl && !msg.isDeleted && (
                               isDocFile ? (
                                 <div 
@@ -607,8 +617,8 @@ export default function Messages() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Form Input Action Module Frame */}
-            <div className="border-t border-gray-100 p-3 bg-white shrink-0 relative z-30">
+            {/* 🛑 C. STATIC FIXED FORM INPUT ACTION MODULE */}
+            <div className="border-t border-gray-100 p-3 bg-white shrink-0 z-20 relative w-full">
               
               {/* ↩️ FLOATING REPLY PREVIEW BOARD */}
               {replyingToMessage && (
@@ -654,7 +664,7 @@ export default function Messages() {
               )}
 
               {/* Master Input Control Elements Bar Row */}
-              <form onSubmit={handleSendMessage} className="flex items-center gap-2">
+              <form onSubmit={handleSendMessage} className="flex items-center gap-2 w-full">
                 <div className="flex items-center gap-1 shrink-0">
                   <input ref={fileInputRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt" className="hidden" onChange={handleImageChange} />
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 text-slate-400 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-colors" title="Attach Files / Docs">
@@ -680,10 +690,10 @@ export default function Messages() {
 
           </div>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6">
+          <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6 bg-white">
             <span className="text-4xl mb-2 opacity-50">💬</span>
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">No Chat Selected</p>
-            <p className="text-[11px] text-slate-400 mt-1 font-medium">Pick a thread from the left index panel to open secure real-time streams.</p>
+            <p className="text-[11px] text-slate-400 mt-1 font-medium text-center">Pick a thread from the left index panel to open secure real-time streams.</p>
           </div>
         )}
       </div>
@@ -695,6 +705,7 @@ export default function Messages() {
           className="fixed inset-0 bg-black/90 z-[9999] flex items-center justify-center p-4 backdrop-blur-xs cursor-zoom-out animate-fadeIn"
         >
           <button 
+            type="button"
             onClick={() => setZoomedImageUrl(null)} 
             className="absolute top-4 right-4 text-white/70 hover:text-white bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-colors duration-150"
           >

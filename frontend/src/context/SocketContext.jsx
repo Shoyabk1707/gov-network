@@ -62,7 +62,7 @@ export const SocketProvider = ({ children }) => {
         setUnreadMessagesCount(prev => prev + 1);
         
         // 💬 Realtime Alert popup on Feed!
-        toast(`💬 Naya Message: ${data.text}`, {
+        toast(`💬 New Message: ${data.text}`, {
           duration: 4000,
           position: 'top-right',
           style: {
